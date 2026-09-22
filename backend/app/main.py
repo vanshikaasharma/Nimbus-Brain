@@ -1,6 +1,6 @@
 """Nimbus Brain API.
 
-Checkpoint 2: health check plus a read of the fake company tables.
+Checkpoint 3: naive doc search plus the customer spreadsheet from checkpoint 2.
 """
 
 import os
@@ -9,8 +9,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 import psycopg
 from psycopg.rows import dict_row
+
+from app.rag.naive import ask
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -26,6 +29,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1)
 
 
 @app.get("/health")
@@ -60,3 +67,14 @@ def list_customers():
         return {"error": f"Could not read the database: {exc}"}
 
     return {"customers": rows}
+
+
+@app.post("/ask")
+def ask_docs(req: AskRequest):
+    """Naive RAG: nearest doc chunks only. Does not query invoices."""
+    if not DATABASE_URL:
+        return {"error": "DATABASE_URL is not set"}
+    try:
+        return ask(DATABASE_URL, req.question.strip())
+    except psycopg.Error as exc:
+        return {"error": f"Could not search docs: {exc}"}

@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 2. We have a few company docs and a tiny customer / invoice database. Still no chatbot.
+**Where we are:** checkpoint 3. Naive RAG over the markdown docs. It does not query invoices.
 
 ## Why not just chat with PDFs?
 
@@ -15,6 +15,12 @@ A real company question can need three different kinds of lookup:
 3. **Links between entities** — “Which Enterprise accounts were on incident INC-104?” (a graph hop)
 
 Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point of this project.
+
+## Naive search (this checkpoint)
+
+`ingest_docs.py` splits each markdown file on `##` headings, embeds the chunks with a local model (BAAI/bge-small-en-v1.5), and stores them in `doc_chunks` on the same Neon database (pgvector).
+
+`POST /ask` embeds the question, returns the top 3 chunks, and (if you set `OPENAI_API_KEY`) writes an answer from those chunks only. It never runs SQL.
 
 ## Fake company (this checkpoint)
 
@@ -28,7 +34,7 @@ Postgres (Neon) has three tables: `plans`, `customers`, `invoices`. Six accounts
 
 ## How to run
 
-Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`).
+Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`). `OPENAI_API_KEY` is optional; without it, `/ask` still returns the nearest passages.
 
 ```bash
 # one-time: install and seed
@@ -36,6 +42,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 python backend/app/ingest/seed.py
+python backend/app/ingest/ingest_docs.py
 ```
 
 ```bash
@@ -52,8 +59,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. You should see **API status: connected** and a table of invoices.
+Open http://localhost:5173.
+
+Try:
+
+- “What is the Pro rate limit?” — should quote `pricing.md` (200 requests / second).
+- “What was Acme’s invoice last month?” — docs do not have that number (`$3,470` lives in Neon invoices). Naive RAG cannot look it up.
 
 ## What’s next
 
-Checkpoint 3: dumb document search (naive RAG). Number questions will still fail — that is the demo.
+Checkpoint 4: text-to-SQL so invoice questions hit tables, not chunks.

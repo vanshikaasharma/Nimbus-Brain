@@ -12,7 +12,7 @@ body {
 }
 
 .page {
-  max-width: 40rem;
+  max-width: 48rem;
   margin: 0 auto;
   padding: 4rem 1.5rem;
 }
@@ -70,4 +70,80 @@ td {
 th {
   color: #8f9c96;
   font-weight: 600;
+}
+
+.ask textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #2c3834;
+  border-radius: 8px;
+  background: #1a211f;
+  color: inherit;
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+}
+
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #6ec8b8;
+  color: #111614;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  color: #8f9c96;
+  border: 1px solid #2c3834;
+  font-weight: 400;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.answer {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background: #1a211f;
+  border-radius: 8px;
+}
+
+.chunks {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.chunks li {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  background: #1a211f;
+  border: 1px solid #2c3834;
+  border-radius: 8px;
+}
+
+.chunks .score {
+  margin-left: 0.6rem;
+  color: #8f9c96;
+  font-size: 0.85rem;
+}
+
+.chunks pre {
+  margin: 0.6rem 0 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #c5cec9;
 }
