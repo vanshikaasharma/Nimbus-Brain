@@ -39,3 +39,35 @@ h1 {
 .status strong {
   font-weight: 600;
 }
+
+h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+code {
+  font-size: 0.9em;
+}
+
+.error {
+  color: #d98980;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid #2c3834;
+}
+
+th {
+  color: #8f9c96;
+  font-weight: 600;
+}
