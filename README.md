@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 3. Naive RAG over the markdown docs. It does not query invoices.
+**Where we are:** checkpoint 4. Naive RAG over docs, plus a separate read-only SQL path for invoices. There is still no router — you pick which tool to call.
 
 ## Why not just chat with PDFs?
 
@@ -16,7 +16,13 @@ A real company question can need three different kinds of lookup:
 
 Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point of this project.
 
-## Naive search (this checkpoint)
+## Spreadsheet lookup (this checkpoint)
+
+`POST /sql` turns a question into a `SELECT` over `plans`, `customers`, and `invoices` only. Writes are rejected. If `OPENAI_API_KEY` is missing, a small template matcher covers the demo questions so you can still see real rows.
+
+Ask the **same** invoice question in both boxes: docs will miss `$3,470`; SQL will return it.
+
+## Naive search
 
 `ingest_docs.py` splits each markdown file on `##` headings, embeds the chunks with a local model (BAAI/bge-small-en-v1.5), and stores them in `doc_chunks` on the same Neon database (pgvector).
 
@@ -63,9 +69,10 @@ Open http://localhost:5173.
 
 Try:
 
-- “What is the Pro rate limit?” — should quote `pricing.md` (200 requests / second).
-- “What was Acme’s invoice last month?” — docs do not have that number (`$3,470` lives in Neon invoices). Naive RAG cannot look it up.
+- Docs: “What is the Pro rate limit?” — `pricing.md` / changelog (200 requests / second).
+- Docs: “What was Acme’s invoice last month?” — still no `$3,470`.
+- Tables: “What was Acme’s invoice last month?” — `SELECT` returns **$3,470.00** for August 2026.
 
 ## What’s next
 
-Checkpoint 4: text-to-SQL so invoice questions hit tables, not chunks.
+Checkpoint 5: a relationship map (graph hops) for “who was on INC-104?”

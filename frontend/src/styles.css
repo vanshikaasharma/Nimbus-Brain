@@ -147,3 +147,18 @@ button:disabled {
   font-size: 0.9rem;
   color: #c5cec9;
 }
+
+.hint {
+  color: #8f9c96;
+  font-size: 0.95rem;
+}
+
+pre.sql {
+  margin: 0.75rem 0;
+  padding: 0.85rem 1rem;
+  background: #1a211f;
+  border: 1px solid #2c3834;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+}

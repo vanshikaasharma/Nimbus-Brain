@@ -1,6 +1,6 @@
 """Nimbus Brain API.
 
-Checkpoint 3: naive doc search plus the customer spreadsheet from checkpoint 2.
+Checkpoint 4: naive doc search plus a separate read-only SQL path.
 """
 
 import os
@@ -14,6 +14,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.rag.naive import ask
+from app.rag.sql_tool import run_question
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -78,3 +79,14 @@ def ask_docs(req: AskRequest):
         return ask(DATABASE_URL, req.question.strip())
     except psycopg.Error as exc:
         return {"error": f"Could not search docs: {exc}"}
+
+
+@app.post("/sql")
+def ask_sql(req: AskRequest):
+    """Guarded SELECT over plans/customers/invoices. Still not a router."""
+    if not DATABASE_URL:
+        return {"error": "DATABASE_URL is not set"}
+    try:
+        return run_question(DATABASE_URL, req.question.strip())
+    except psycopg.Error as exc:
+        return {"error": f"Could not run SQL: {exc}"}

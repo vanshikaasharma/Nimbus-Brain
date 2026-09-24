@@ -20,20 +20,31 @@ function dollars(cents: number) {
   return (cents / 100).toFixed(2);
 }
 
-const EXAMPLES = [
+const DOC_EXAMPLES = [
   "What is the Pro rate limit?",
   "What was Acme’s invoice last month?",
+];
+
+const SQL_EXAMPLES = [
+  "What was Acme’s invoice last month?",
+  "Which customers are on Enterprise?",
 ];
 
 export default function App() {
   const [apiStatus, setApiStatus] = useState("checking…");
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [dbError, setDbError] = useState<string | null>(null);
-  const [question, setQuestion] = useState(EXAMPLES[0]);
+  const [question, setQuestion] = useState(DOC_EXAMPLES[0]);
   const [pending, setPending] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [askError, setAskError] = useState<string | null>(null);
+  const [sqlQuestion, setSqlQuestion] = useState(SQL_EXAMPLES[0]);
+  const [sqlPending, setSqlPending] = useState(false);
+  const [sqlError, setSqlError] = useState<string | null>(null);
+  const [sqlText, setSqlText] = useState<string | null>(null);
+  const [sqlExplanation, setSqlExplanation] = useState<string | null>(null);
+  const [sqlRows, setSqlRows] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     fetch("/api/health")
@@ -81,6 +92,44 @@ export default function App() {
     }
   }
 
+  async function onSql(event: FormEvent) {
+    event.preventDefault();
+    const text = sqlQuestion.trim();
+    if (!text || sqlPending) return;
+    setSqlPending(true);
+    setSqlError(null);
+    try {
+      const res = await fetch("/api/sql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setSqlError(data.error);
+        setSqlText(data.sql ?? null);
+        setSqlExplanation(null);
+        setSqlRows([]);
+        return;
+      }
+      setSqlText(data.sql);
+      setSqlExplanation(data.explanation);
+      setSqlRows(data.rows ?? []);
+    } catch {
+      setSqlError("SQL ask failed. Is the API running?");
+    } finally {
+      setSqlPending(false);
+    }
+  }
+
+  function formatCell(column: string, value: unknown) {
+    if (column.includes("amount_cents") && typeof value === "number") {
+      return `$${dollars(value)}`;
+    }
+    if (value === null || value === undefined) return "";
+    return String(value);
+  }
+
   return (
     <div className="page">
       <h1>Nimbus Brain</h1>
@@ -88,8 +137,8 @@ export default function App() {
         Internal copilot for Nimbus, a fake usage-based API company.
       </p>
       <p>
-        Checkpoint 3: naive RAG over <code>corpus/</code>. It can quote the
-        pricing doc. It cannot honestly read Acme’s invoice.
+        Checkpoint 4: docs search and SQL are two separate buttons. Same
+        invoice question fails on docs and works on tables.
       </p>
       <p className="status">
         API status: <strong>{apiStatus}</strong>
@@ -104,7 +153,7 @@ export default function App() {
           disabled={pending}
         />
         <div className="ask-actions">
-          {EXAMPLES.map((example) => (
+          {DOC_EXAMPLES.map((example) => (
             <button
               key={example}
               type="button"
@@ -133,6 +182,57 @@ export default function App() {
             </li>
           ))}
         </ul>
+      )}
+
+      <h2>Ask the tables</h2>
+      <p className="hint">
+        This hits Neon with a guarded SELECT. It does not search markdown.
+      </p>
+      <form className="ask" onSubmit={onSql}>
+        <textarea
+          rows={3}
+          value={sqlQuestion}
+          onChange={(e) => setSqlQuestion(e.target.value)}
+          disabled={sqlPending}
+        />
+        <div className="ask-actions">
+          {SQL_EXAMPLES.map((example) => (
+            <button
+              key={example}
+              type="button"
+              className="ghost"
+              onClick={() => setSqlQuestion(example)}
+            >
+              {example}
+            </button>
+          ))}
+          <button type="submit" disabled={sqlPending || !sqlQuestion.trim()}>
+            {sqlPending ? "Querying…" : "Run SQL"}
+          </button>
+        </div>
+      </form>
+      {sqlError && <p className="error">{sqlError}</p>}
+      {sqlExplanation && <p className="hint">{sqlExplanation}</p>}
+      {sqlText && <pre className="sql">{sqlText}</pre>}
+      {sqlRows.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              {Object.keys(sqlRows[0]).map((col) => (
+                <th key={col}>{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sqlRows.map((row, index) => (
+              <tr key={index}>
+                {Object.keys(sqlRows[0]).map((col) => (
+                  <td key={col}>{formatCell(col, row[col])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       <h2>Seeded invoices (SQL, not RAG)</h2>
