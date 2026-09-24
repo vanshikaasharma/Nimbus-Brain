@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 6. One question is routed to docs, SQL, or the graph. A question that needs more than one tool is refused for now.
+**Where we are:** checkpoint 7. A mixed question runs graph, then SQL, then docs. Answers are evidence, not a model paragraph — there is no API key.
 
 ## Why not just chat with PDFs?
 
@@ -16,7 +16,17 @@ A real company question can need three different kinds of lookup:
 
 Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point of this project.
 
-## Traffic cop (this checkpoint)
+## Mixed question (this checkpoint)
+
+If the router marks a question `mixed`, `mixed.py` always does three lookups:
+
+1. Graph: INC-104 → impacted accounts → plan
+2. SQL: August invoices for those account names
+3. Docs: the Enterprise SLA credit section
+
+The sentence on screen is a template. `OPENAI_API_KEY` is optional and unused. Single-tool questions still do not call a chat model either: docs show chunks, SQL shows rows, the graph shows paths.
+
+## Traffic cop
 
 `POST /chat` runs `router.py` first. The rules are keywords, not an LLM:
 
@@ -88,8 +98,8 @@ Try the routed box:
 - “What is the Pro rate limit?” → **docs**
 - “What was Acme’s invoice last month?” → **sql**, **$3,470.00**
 - “Which Enterprise customers were on INC-104?” → **graph**, Acme and Soylent
-- A question that asks for the SLA, the accounts, and the dollars together → **mixed**, no tool runs
+- SLA + who was hit + the August invoice → **mixed**: Acme and Soylent, their August rows, and the SLA chunk
 
 ## What’s next
 
-Checkpoint 7: the labeled question set, so the README can compare naive docs-only search with this router.
+Checkpoint 8: a small labeled question file and an honest score against docs-only search.

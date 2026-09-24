@@ -49,7 +49,7 @@ def classify(question: str) -> dict:
             "reason": (
                 "This question needs more than one tool ("
                 + " + ".join(hits)
-                + "). The combiner comes in a later checkpoint."
+                + "), so the fixed pipeline runs graph, then SQL, then docs."
             ),
         }
     if hits == ["docs"]:

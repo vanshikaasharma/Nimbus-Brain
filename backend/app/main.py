@@ -1,6 +1,6 @@
 """Nimbus Brain API.
 
-Checkpoint 6: one question is routed to docs, SQL, or the graph.
+Checkpoint 7: mixed questions run graph, then SQL, then docs.
 """
 
 import os
@@ -14,6 +14,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.rag.graph_tool import walk
+from app.rag.mixed import run_mixed
 from app.rag.naive import ask
 from app.rag.router import classify
 from app.rag.sql_tool import run_question
@@ -107,7 +108,7 @@ def ask_graph(req: AskRequest):
 
 @app.post("/chat")
 def chat(req: AskRequest):
-    """Classify, then call exactly one tool. Mixed questions are not answered yet."""
+    """Classify, then call one tool. Mixed questions run the fixed three-tool pipeline."""
     if not DATABASE_URL:
         return {"error": "DATABASE_URL is not set"}
 
@@ -122,6 +123,8 @@ def chat(req: AskRequest):
             result["sql"] = run_question(DATABASE_URL, req.question.strip())
         elif route == "graph":
             result["graph"] = walk(DATABASE_URL, req.question.strip())
+        elif route == "mixed":
+            result.update(run_mixed(DATABASE_URL, req.question.strip()))
     except psycopg.Error as exc:
         return {"error": f"Routed to {route}, then the database failed: {exc}", **result}
 

@@ -39,6 +39,7 @@ const ROUTED_EXAMPLES = [
   "What is the Pro rate limit?",
   "What was Acme’s invoice last month?",
   "Which Enterprise customers were on INC-104?",
+  "Which Enterprise customers were hit by the outage, what does the SLA say we owe them, and how much was the August invoice?",
 ];
 
 export default function App() {
@@ -235,8 +236,8 @@ export default function App() {
         Internal copilot for Nimbus, a fake usage-based API company.
       </p>
       <p>
-        Checkpoint 6: one box picks docs, SQL, or the graph. The three tools
-        below still work if you want to call them yourself.
+        Checkpoint 7: a mixed question runs the graph, then SQL, then the SLA
+        doc. Nothing here is written by a chat model.
       </p>
       <p className="status">
         API status: <strong>{apiStatus}</strong>
