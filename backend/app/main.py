@@ -1,6 +1,6 @@
 """Nimbus Brain API.
 
-Checkpoint 4: naive doc search plus a separate read-only SQL path.
+Checkpoint 5: docs, SQL, and a graph hop. You still pick the tool.
 """
 
 import os
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.graph_tool import walk
 from app.rag.naive import ask
 from app.rag.sql_tool import run_question
 
@@ -90,3 +91,14 @@ def ask_sql(req: AskRequest):
         return run_question(DATABASE_URL, req.question.strip())
     except psycopg.Error as exc:
         return {"error": f"Could not run SQL: {exc}"}
+
+
+@app.post("/graph")
+def ask_graph(req: AskRequest):
+    """Two-hop walk: incident → account → plan."""
+    if not DATABASE_URL:
+        return {"error": "DATABASE_URL is not set"}
+    try:
+        return walk(DATABASE_URL, req.question.strip())
+    except psycopg.Error as exc:
+        return {"error": f"Could not walk the graph: {exc}"}

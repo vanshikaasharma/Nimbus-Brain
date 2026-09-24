@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 4. Naive RAG over docs, plus a separate read-only SQL path for invoices. There is still no router — you pick which tool to call.
+**Where we are:** checkpoint 5. Docs, SQL, and a graph hop. There is still no router — you pick which tool to call.
 
 ## Why not just chat with PDFs?
 
@@ -16,7 +16,13 @@ A real company question can need three different kinds of lookup:
 
 Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point of this project.
 
-## Spreadsheet lookup (this checkpoint)
+## Relationship map (this checkpoint)
+
+`seed_graph.py` copies plans and customers into `nodes`, then adds incident **INC-104** and two edge types: `IMPACTS` (incident → account) and `SUBSCRIBED_TO` (account → plan). Acme and Soylent are the only accounts on the incident. Both are Enterprise.
+
+`POST /graph` walks that path. It does not search markdown and it does not read invoices.
+
+## Spreadsheet lookup
 
 `POST /sql` turns a question into a `SELECT` over `plans`, `customers`, and `invoices` only. Writes are rejected. If `OPENAI_API_KEY` is missing, a small template matcher covers the demo questions so you can still see real rows.
 
@@ -49,6 +55,7 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 python backend/app/ingest/seed.py
 python backend/app/ingest/ingest_docs.py
+python backend/app/ingest/seed_graph.py
 ```
 
 ```bash
@@ -72,7 +79,8 @@ Try:
 - Docs: “What is the Pro rate limit?” — `pricing.md` / changelog (200 requests / second).
 - Docs: “What was Acme’s invoice last month?” — still no `$3,470`.
 - Tables: “What was Acme’s invoice last month?” — `SELECT` returns **$3,470.00** for August 2026.
+- Graph: “Which Enterprise customers were on INC-104?” — paths **INC-104 → Acme → Enterprise** and **INC-104 → Soylent → Enterprise**.
 
 ## What’s next
 
-Checkpoint 5: a relationship map (graph hops) for “who was on INC-104?”
+Checkpoint 6: a traffic cop that picks docs, SQL, or the graph for you.

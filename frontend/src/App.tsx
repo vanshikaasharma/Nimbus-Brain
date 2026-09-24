@@ -30,6 +30,11 @@ const SQL_EXAMPLES = [
   "Which customers are on Enterprise?",
 ];
 
+const GRAPH_EXAMPLES = [
+  "Which Enterprise customers were on INC-104?",
+  "Who was hit by the ingest outage?",
+];
+
 export default function App() {
   const [apiStatus, setApiStatus] = useState("checking…");
   const [rows, setRows] = useState<InvoiceRow[]>([]);
@@ -45,6 +50,11 @@ export default function App() {
   const [sqlText, setSqlText] = useState<string | null>(null);
   const [sqlExplanation, setSqlExplanation] = useState<string | null>(null);
   const [sqlRows, setSqlRows] = useState<Record<string, unknown>[]>([]);
+  const [graphQuestion, setGraphQuestion] = useState(GRAPH_EXAMPLES[0]);
+  const [graphPending, setGraphPending] = useState(false);
+  const [graphError, setGraphError] = useState<string | null>(null);
+  const [graphPaths, setGraphPaths] = useState<string[]>([]);
+  const [graphTriples, setGraphTriples] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/health")
@@ -122,6 +132,34 @@ export default function App() {
     }
   }
 
+  async function onGraph(event: FormEvent) {
+    event.preventDefault();
+    const text = graphQuestion.trim();
+    if (!text || graphPending) return;
+    setGraphPending(true);
+    setGraphError(null);
+    try {
+      const res = await fetch("/api/graph", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setGraphError(data.error);
+        setGraphPaths([]);
+        setGraphTriples([]);
+        return;
+      }
+      setGraphPaths(data.paths ?? []);
+      setGraphTriples(data.triples ?? []);
+    } catch {
+      setGraphError("Graph ask failed. Is the API running?");
+    } finally {
+      setGraphPending(false);
+    }
+  }
+
   function formatCell(column: string, value: unknown) {
     if (column.includes("amount_cents") && typeof value === "number") {
       return `$${dollars(value)}`;
@@ -137,8 +175,8 @@ export default function App() {
         Internal copilot for Nimbus, a fake usage-based API company.
       </p>
       <p>
-        Checkpoint 4: docs search and SQL are two separate buttons. Same
-        invoice question fails on docs and works on tables.
+        Checkpoint 5: docs, tables, and a graph hop are three separate
+        buttons. INC-104 is a path, not a paragraph.
       </p>
       <p className="status">
         API status: <strong>{apiStatus}</strong>
@@ -233,6 +271,51 @@ export default function App() {
             ))}
           </tbody>
         </table>
+      )}
+
+      <h2>Ask the graph</h2>
+      <p className="hint">
+        Walks incident → account → plan. It does not search docs or invoices.
+      </p>
+      <form className="ask" onSubmit={onGraph}>
+        <textarea
+          rows={3}
+          value={graphQuestion}
+          onChange={(e) => setGraphQuestion(e.target.value)}
+          disabled={graphPending}
+        />
+        <div className="ask-actions">
+          {GRAPH_EXAMPLES.map((example) => (
+            <button
+              key={example}
+              type="button"
+              className="ghost"
+              onClick={() => setGraphQuestion(example)}
+            >
+              {example}
+            </button>
+          ))}
+          <button type="submit" disabled={graphPending || !graphQuestion.trim()}>
+            {graphPending ? "Walking…" : "Walk graph"}
+          </button>
+        </div>
+      </form>
+      {graphError && <p className="error">{graphError}</p>}
+      {graphPaths.length > 0 && (
+        <ul className="paths">
+          {graphPaths.map((path) => (
+            <li key={path}>{path}</li>
+          ))}
+        </ul>
+      )}
+      {graphTriples.length > 0 && (
+        <ul className="chunks">
+          {graphTriples.map((triple) => (
+            <li key={triple}>
+              <code>{triple}</code>
+            </li>
+          ))}
+        </ul>
       )}
 
       <h2>Seeded invoices (SQL, not RAG)</h2>

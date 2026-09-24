@@ -153,6 +153,17 @@ button:disabled {
   font-size: 0.95rem;
 }
 
+.paths {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+}
+
+.paths li {
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+
 pre.sql {
   margin: 0.75rem 0;
   padding: 0.85rem 1rem;
