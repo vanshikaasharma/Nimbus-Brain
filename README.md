@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 5. Docs, SQL, and a graph hop. There is still no router — you pick which tool to call.
+**Where we are:** checkpoint 6. One question is routed to docs, SQL, or the graph. A question that needs more than one tool is refused for now.
 
 ## Why not just chat with PDFs?
 
@@ -16,7 +16,16 @@ A real company question can need three different kinds of lookup:
 
 Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point of this project.
 
-## Relationship map (this checkpoint)
+## Traffic cop (this checkpoint)
+
+`POST /chat` runs `router.py` first. The rules are keywords, not an LLM:
+
+- rate limit / SLA / pricing → docs
+- invoice / bill, or “who is on Enterprise” → SQL
+- INC-104 / incident / outage → graph
+- two of those at once → `mixed`, and no tool runs
+
+## Relationship map
 
 `seed_graph.py` copies plans and customers into `nodes`, then adds incident **INC-104** and two edge types: `IMPACTS` (incident → account) and `SUBSCRIBED_TO` (account → plan). Acme and Soylent are the only accounts on the incident. Both are Enterprise.
 
@@ -74,13 +83,13 @@ npm run dev
 
 Open http://localhost:5173.
 
-Try:
+Try the routed box:
 
-- Docs: “What is the Pro rate limit?” — `pricing.md` / changelog (200 requests / second).
-- Docs: “What was Acme’s invoice last month?” — still no `$3,470`.
-- Tables: “What was Acme’s invoice last month?” — `SELECT` returns **$3,470.00** for August 2026.
-- Graph: “Which Enterprise customers were on INC-104?” — paths **INC-104 → Acme → Enterprise** and **INC-104 → Soylent → Enterprise**.
+- “What is the Pro rate limit?” → **docs**
+- “What was Acme’s invoice last month?” → **sql**, **$3,470.00**
+- “Which Enterprise customers were on INC-104?” → **graph**, Acme and Soylent
+- A question that asks for the SLA, the accounts, and the dollars together → **mixed**, no tool runs
 
 ## What’s next
 
-Checkpoint 6: a traffic cop that picks docs, SQL, or the graph for you.
+Checkpoint 7: the labeled question set, so the README can compare naive docs-only search with this router.

@@ -35,6 +35,12 @@ const GRAPH_EXAMPLES = [
   "Who was hit by the ingest outage?",
 ];
 
+const ROUTED_EXAMPLES = [
+  "What is the Pro rate limit?",
+  "What was Acme’s invoice last month?",
+  "Which Enterprise customers were on INC-104?",
+];
+
 export default function App() {
   const [apiStatus, setApiStatus] = useState("checking…");
   const [rows, setRows] = useState<InvoiceRow[]>([]);
@@ -55,6 +61,16 @@ export default function App() {
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphPaths, setGraphPaths] = useState<string[]>([]);
   const [graphTriples, setGraphTriples] = useState<string[]>([]);
+  const [routedQuestion, setRoutedQuestion] = useState(ROUTED_EXAMPLES[0]);
+  const [routePending, setRoutePending] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeName, setRouteName] = useState<string | null>(null);
+  const [routeReason, setRouteReason] = useState<string | null>(null);
+  const [routeAnswer, setRouteAnswer] = useState<string | null>(null);
+  const [routeChunks, setRouteChunks] = useState<Chunk[]>([]);
+  const [routeSql, setRouteSql] = useState<string | null>(null);
+  const [routeSqlRows, setRouteSqlRows] = useState<Record<string, unknown>[]>([]);
+  const [routePaths, setRoutePaths] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/health")
@@ -132,6 +148,50 @@ export default function App() {
     }
   }
 
+  async function onRoute(event: FormEvent) {
+    event.preventDefault();
+    const text = routedQuestion.trim();
+    if (!text || routePending) return;
+    setRoutePending(true);
+    setRouteError(null);
+    setRouteName(null);
+    setRouteReason(null);
+    setRouteAnswer(null);
+    setRouteChunks([]);
+    setRouteSql(null);
+    setRouteSqlRows([]);
+    setRoutePaths([]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: text }),
+      });
+      const data = await res.json();
+      if (data.error && !data.route) {
+        setRouteError(data.error);
+        return;
+      }
+      setRouteName(data.route ?? null);
+      setRouteReason(data.reason ?? null);
+      setRouteAnswer(data.answer ?? null);
+      setRouteChunks(data.chunks ?? []);
+      if (data.sql?.error) {
+        setRouteError(data.sql.error);
+      }
+      setRouteSql(data.sql?.sql ?? null);
+      setRouteSqlRows(data.sql?.rows ?? []);
+      if (data.graph?.error) {
+        setRouteError(data.graph.error);
+      }
+      setRoutePaths(data.graph?.paths ?? []);
+    } catch {
+      setRouteError("Chat failed. Is the API running?");
+    } finally {
+      setRoutePending(false);
+    }
+  }
+
   async function onGraph(event: FormEvent) {
     event.preventDefault();
     const text = graphQuestion.trim();
@@ -175,13 +235,87 @@ export default function App() {
         Internal copilot for Nimbus, a fake usage-based API company.
       </p>
       <p>
-        Checkpoint 5: docs, tables, and a graph hop are three separate
-        buttons. INC-104 is a path, not a paragraph.
+        Checkpoint 6: one box picks docs, SQL, or the graph. The three tools
+        below still work if you want to call them yourself.
       </p>
       <p className="status">
         API status: <strong>{apiStatus}</strong>
       </p>
 
+      <h2>Ask (routed)</h2>
+      <form className="ask" onSubmit={onRoute}>
+        <textarea
+          rows={3}
+          value={routedQuestion}
+          onChange={(e) => setRoutedQuestion(e.target.value)}
+          disabled={routePending}
+        />
+        <div className="ask-actions">
+          {ROUTED_EXAMPLES.map((example) => (
+            <button
+              key={example}
+              type="button"
+              className="ghost"
+              onClick={() => setRoutedQuestion(example)}
+            >
+              {example}
+            </button>
+          ))}
+          <button type="submit" disabled={routePending || !routedQuestion.trim()}>
+            {routePending ? "Routing…" : "Ask"}
+          </button>
+        </div>
+      </form>
+      {routeError && <p className="error">{routeError}</p>}
+      {routeName && (
+        <p className="status">
+          Route: <strong>{routeName}</strong>
+          {routeReason ? ` — ${routeReason}` : ""}
+        </p>
+      )}
+      {routeAnswer && <p className="answer">{routeAnswer}</p>}
+      {routeChunks.length > 0 && (
+        <ul className="chunks">
+          {routeChunks.map((chunk) => (
+            <li key={`${chunk.doc_path}-${chunk.section}`}>
+              <code>
+                {chunk.doc_path} &gt; {chunk.section}
+              </code>
+              <pre>{chunk.body}</pre>
+            </li>
+          ))}
+        </ul>
+      )}
+      {routeSql && <pre className="sql">{routeSql}</pre>}
+      {routeSqlRows.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              {Object.keys(routeSqlRows[0]).map((col) => (
+                <th key={col}>{col}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {routeSqlRows.map((row, index) => (
+              <tr key={index}>
+                {Object.keys(routeSqlRows[0]).map((col) => (
+                  <td key={col}>{formatCell(col, row[col])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {routePaths.length > 0 && (
+        <ul className="paths">
+          {routePaths.map((path) => (
+            <li key={path}>{path}</li>
+          ))}
+        </ul>
+      )}
+
+      <h2>Call a tool yourself</h2>
       <h2>Ask the docs</h2>
       <form className="ask" onSubmit={onAsk}>
         <textarea
