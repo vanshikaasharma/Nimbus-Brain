@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** checkpoint 7. A mixed question runs graph, then SQL, then docs. Answers are evidence, not a model paragraph — there is no API key.
+**Where we are:** a 10-question report card. Routing, SQL rows, graph names, and doc hits are scored. Vector-only search still misses Acme’s invoice.
 
 ## Why not just chat with PDFs?
 
@@ -24,7 +24,7 @@ If the router marks a question `mixed`, `mixed.py` always does three lookups:
 2. SQL: August invoices for those account names
 3. Docs: the Enterprise SLA credit section
 
-The sentence on screen is a template. `OPENAI_API_KEY` is optional and unused. Single-tool questions still do not call a chat model either: docs show chunks, SQL shows rows, the graph shows paths.
+If Ollama is running, one local model call writes the sentence from that evidence. The chunks, rows, and paths are still shown.
 
 ## Traffic cop
 
@@ -33,7 +33,7 @@ The sentence on screen is a template. `OPENAI_API_KEY` is optional and unused. S
 - rate limit / SLA / pricing → docs
 - invoice / bill, or “who is on Enterprise” → SQL
 - INC-104 / incident / outage → graph
-- two of those at once → `mixed`, and no tool runs
+- two of those at once → `mixed`, which runs graph, then SQL, then docs
 
 ## Relationship map
 
@@ -49,7 +49,7 @@ Ask the **same** invoice question in both boxes: docs will miss `$3,470`; SQL wi
 
 ## Naive search
 
-`ingest_docs.py` splits each markdown file on `##` headings, embeds the chunks with a local model (BAAI/bge-small-en-v1.5), and stores them in `doc_chunks` on the same Neon database (pgvector).
+`ingest_docs.py` splits each markdown file on `##` headings, embeds the chunks with a local model (BAAI/bge-small-en-v1.5), and stores them in `doc_chunks` (pgvector). `retrieve.py` also keyword-searches the same rows (`tsvector`) and fuses the two ranked lists.
 
 `POST /ask` embeds the question, returns the top 3 chunks, and (if you set `OPENAI_API_KEY`) writes an answer from those chunks only. It never runs SQL.
 
@@ -100,6 +100,28 @@ Try the routed box:
 - “Which Enterprise customers were on INC-104?” → **graph**, Acme and Soylent
 - SLA + who was hit + the August invoice → **mixed**: Acme and Soylent, their August rows, and the SLA chunk
 
-## What’s next
+## Is this agentic RAG?
 
-Checkpoint 8: a small labeled question file and an honest score against docs-only search.
+No. An agent would let a model choose tools, look at the result, and decide whether to call another tool. This project does not do that.
+
+A keyword function picks `docs`, `sql`, `graph`, or `mixed`. Mixed always runs the same three steps in the same order. SQL and the graph fill in templates. Docs search returns chunks. A chat model is optional and only writes a sentence for a docs-only question when `OPENAI_API_KEY` is set.
+
+## Report card
+
+`backend/eval/golden.json` has 10 questions. Run:
+
+```bash
+python backend/eval/run_eval.py
+```
+
+Last run on this seeded database:
+
+| Check | Score |
+| --- | --- |
+| Routing (docs / sql / graph / mixed / unknown) | 10/10 |
+| SQL row match (Acme $3,470, Soylent $2,180, Enterprise names) | 3/3 |
+| Graph names on INC-104 | 2/2 |
+| Expected doc file in the reranked passages | 3/3 |
+| Vector-only search contains Acme’s $3,470 | no |
+
+The last row is the point. Embedding search over the markdown does not see the invoice table. The SQL route does. These scores are on 10 hand-written questions that match the keyword rules, so routing at 10/10 is expected. It is not a claim about unseen questions.

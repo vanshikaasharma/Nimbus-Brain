@@ -1,0 +1,62 @@
+{
+  "questions": [
+    {
+      "id": "pro-rate-limit",
+      "question": "What is the Pro rate limit?",
+      "route": "docs",
+      "expect_doc": "pricing.md"
+    },
+    {
+      "id": "sla-credit",
+      "question": "What does the Enterprise SLA say about credits?",
+      "route": "docs",
+      "expect_doc": "sla-enterprise.md"
+    },
+    {
+      "id": "changelog-pro",
+      "question": "What did the March changelog change for the Pro rate limit?",
+      "route": "docs",
+      "expect_doc": "changelog.md"
+    },
+    {
+      "id": "acme-invoice",
+      "question": "What was Acme's invoice last month?",
+      "route": "sql",
+      "expect_cents": 347000
+    },
+    {
+      "id": "soylent-invoice",
+      "question": "What was Soylent's invoice in August?",
+      "route": "sql",
+      "expect_cents": 218000
+    },
+    {
+      "id": "enterprise-customers",
+      "question": "Which customers are on Enterprise?",
+      "route": "sql",
+      "expect_names": ["Acme", "Soylent"]
+    },
+    {
+      "id": "inc-104-enterprise",
+      "question": "Which Enterprise customers were on INC-104?",
+      "route": "graph",
+      "expect_names": ["Acme", "Soylent"]
+    },
+    {
+      "id": "outage-who",
+      "question": "Who was hit by the ingest outage?",
+      "route": "graph",
+      "expect_names": ["Acme", "Soylent"]
+    },
+    {
+      "id": "mixed-outage",
+      "question": "Which Enterprise customers were hit by the outage, what does the SLA say we owe them, and how much was the August invoice?",
+      "route": "mixed"
+    },
+    {
+      "id": "side-email",
+      "question": "Did we promise Acme a custom SLO in a side email?",
+      "route": "unknown"
+    }
+  ]
+}

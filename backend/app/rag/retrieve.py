@@ -81,3 +81,26 @@ def hybrid_search(conn, question: str) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def vector_search(conn, question: str, limit: int = 3) -> list[dict]:
+    """Top-k by embedding only. The baseline the report card compares against."""
+    query_vec = embed_texts([question])[0]
+    rows = conn.execute(
+        """
+        SELECT doc_path, section, body, 1 - (embedding <=> %(vec)s::vector) AS score
+        FROM doc_chunks
+        ORDER BY embedding <=> %(vec)s::vector
+        LIMIT %(limit)s
+        """,
+        {"vec": query_vec, "limit": limit},
+    ).fetchall()
+    return [
+        {
+            "doc_path": row["doc_path"],
+            "section": row["section"],
+            "body": row["body"],
+            "score": float(row["score"]),
+        }
+        for row in rows
+    ]
