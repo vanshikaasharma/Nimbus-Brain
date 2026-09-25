@@ -31,10 +31,14 @@ const GRAPH_EXAMPLES = [
 ];
 
 const ROUTED_EXAMPLES = [
-  "What is the Pro rate limit?",
-  "What was Acme’s invoice last month?",
-  "Which Enterprise customers were on INC-104?",
-  "Which Enterprise customers were hit by the outage, what does the SLA say we owe them, and how much was the August invoice?",
+  { label: "Pro rate limit", question: "What is the Pro rate limit?" },
+  { label: "Acme's invoice", question: "What was Acme’s invoice last month?" },
+  { label: "INC-104", question: "Which Enterprise customers were on INC-104?" },
+  {
+    label: "Outage, SLA, and invoice",
+    question:
+      "Which Enterprise customers were hit by the outage, what does the SLA say we owe them, and how much was the August invoice?",
+  },
 ];
 
 export default function App() {
@@ -57,7 +61,7 @@ export default function App() {
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphPaths, setGraphPaths] = useState<string[]>([]);
   const [graphTriples, setGraphTriples] = useState<string[]>([]);
-  const [routedQuestion, setRoutedQuestion] = useState(ROUTED_EXAMPLES[0]);
+  const [routedQuestion, setRoutedQuestion] = useState(ROUTED_EXAMPLES[0].question);
   const [routePending, setRoutePending] = useState(false);
   const [routeMode, setRouteMode] = useState<"chat" | "agent">("chat");
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -235,15 +239,13 @@ export default function App() {
     <div className="page">
       <h1>Nimbus Brain</h1>
       <p className="tagline">
-        Internal copilot for Nimbus, a fake usage-based API company.
+        Ask about pricing, an invoice, or the INC-104 outage. The panel on the right is the evidence.
       </p>
-      <p>
-        The answer stays on the left. The right panel is the evidence: route,
-        passages, SQL, and graph path.
-      </p>
-      <p className="status">
-        API status: <strong>{apiStatus}</strong>
-      </p>
+      {apiStatus !== "connected" && (
+        <p className="status">
+          API status: <strong>{apiStatus}</strong>
+        </p>
+      )}
 
       <div className="workspace">
         <section>
@@ -261,22 +263,25 @@ export default function App() {
               onChange={(e) => setRoutedQuestion(e.target.value)}
               disabled={routePending}
             />
-            <div className="ask-actions">
+            <div className="examples">
               {ROUTED_EXAMPLES.map((example) => (
                 <button
-                  key={example}
+                  key={example.label}
                   type="button"
                   className="ghost"
-                  onClick={() => setRoutedQuestion(example)}
+                  onClick={() => setRoutedQuestion(example.question)}
                 >
-                  {example}
+                  {example.label}
                 </button>
               ))}
+            </div>
+            <div className="ask-actions">
               <button type="submit" disabled={routePending || !routedQuestion.trim()}>
                 {routePending && routeMode === "chat" ? "Routing…" : "Ask"}
               </button>
               <button
                 type="button"
+                className="secondary"
                 disabled={routePending || !routedQuestion.trim()}
                 onClick={() => void askRouted("agent")}
               >
@@ -299,7 +304,11 @@ export default function App() {
         />
       </div>
 
-      <h2>Call a tool yourself</h2>
+      <details className="lab">
+        <summary>Call a tool yourself</summary>
+        <p className="hint">
+          Docs, SQL, the graph, and the seeded invoices. The question box above already picks one of these.
+        </p>
       <h2>Ask the docs</h2>
       <form className="ask" onSubmit={onAsk}>
         <textarea
@@ -463,6 +472,7 @@ export default function App() {
           </tbody>
         </table>
       )}
+      </details>
     </div>
   );
 }

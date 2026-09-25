@@ -123,11 +123,28 @@ th {
   padding: 0.7rem 0.8rem;
 }
 
+.examples,
 .ask-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.6rem;
+}
+
+.lab {
+  margin-top: 2.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #2c3834;
+}
+
+.lab summary {
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.lab summary:hover {
+  color: #6ec8b8;
 }
 
 button {
@@ -141,11 +158,21 @@ button {
   cursor: pointer;
 }
 
-button.ghost {
+button.ghost,
+button.secondary {
   background: transparent;
+  font-weight: 400;
+}
+
+button.ghost {
   color: #8f9c96;
   border: 1px solid #2c3834;
-  font-weight: 400;
+}
+
+button.secondary {
+  color: #6ec8b8;
+  border: 1px solid #3d6b62;
+  font-weight: 600;
 }
 
 button:disabled {
