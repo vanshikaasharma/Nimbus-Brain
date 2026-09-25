@@ -72,6 +72,7 @@ export default function App() {
   const [routeSql, setRouteSql] = useState<string | null>(null);
   const [routeSqlRows, setRouteSqlRows] = useState<Record<string, unknown>[]>([]);
   const [routePaths, setRoutePaths] = useState<string[]>([]);
+  const [routeRetried, setRouteRetried] = useState(false);
 
   useEffect(() => {
     fetch("/api/health")
@@ -162,6 +163,7 @@ export default function App() {
     setRouteSql(null);
     setRouteSqlRows([]);
     setRoutePaths([]);
+    setRouteRetried(false);
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -186,6 +188,7 @@ export default function App() {
         setRouteError(data.graph.error);
       }
       setRoutePaths(data.graph?.paths ?? []);
+      setRouteRetried(Boolean(data.retried));
     } catch {
       setRouteError("Chat failed. Is the API running?");
     } finally {
@@ -273,6 +276,9 @@ export default function App() {
           Route: <strong>{routeName}</strong>
           {routeReason ? ` — ${routeReason}` : ""}
         </p>
+      )}
+      {routeRetried && (
+        <p className="hint">Retried once after the first passages did not support the question.</p>
       )}
       {routeAnswer && <p className="answer">{routeAnswer}</p>}
       {routeChunks.length > 0 && (

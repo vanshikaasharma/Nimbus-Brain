@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Doc answers: hybrid search, then an optional sentence from those chunks.
+"""Doc answers: hybrid search, rerank, then one grade-and-retry.
 
 This path never looks at invoices or the graph.
 """
@@ -11,6 +11,7 @@ import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 
+from app.rag.grade import grade, rewrite_once
 from app.rag.rerank import rerank
 from app.rag.retrieve import hybrid_search
 
@@ -61,14 +62,37 @@ def ask(database_url: str, question: str, generate: bool = True) -> dict:
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         register_vector(conn)
         chunks = search_chunks(conn, question)
+        verdict = grade(question, chunks)
+        retried = False
+        used_question = question
+
+        if verdict == "irrelevant":
+            rewritten = rewrite_once(question)
+            retried = True
+            if rewritten.lower() != question.lower():
+                used_question = rewritten
+                chunks = search_chunks(conn, rewritten)
+                verdict = grade(rewritten, chunks)
 
     if not chunks:
         return {
             "answer": "No document chunks are indexed yet. Run ingest_docs.py.",
             "chunks": [],
+            "retried": retried,
+            "abstained": True,
+        }
+
+    if verdict == "irrelevant":
+        return {
+            "answer": "I don't have evidence for that in the Nimbus docs.",
+            "chunks": [],
+            "retried": retried,
+            "abstained": True,
         }
 
     return {
-        "answer": generate_answer(question, chunks) if generate else "",
+        "answer": generate_answer(used_question, chunks) if generate else "",
         "chunks": chunks,
+        "retried": retried,
+        "abstained": False,
     }
