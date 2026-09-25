@@ -59,6 +59,7 @@ export default function App() {
   const [graphTriples, setGraphTriples] = useState<string[]>([]);
   const [routedQuestion, setRoutedQuestion] = useState(ROUTED_EXAMPLES[0]);
   const [routePending, setRoutePending] = useState(false);
+  const [routeMode, setRouteMode] = useState<"chat" | "agent">("chat");
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeName, setRouteName] = useState<string | null>(null);
   const [routeReason, setRouteReason] = useState<string | null>(null);
@@ -146,10 +147,10 @@ export default function App() {
     }
   }
 
-  async function onRoute(event: FormEvent) {
-    event.preventDefault();
+  async function askRouted(mode: "chat" | "agent") {
     const text = routedQuestion.trim();
     if (!text || routePending) return;
+    setRouteMode(mode);
     setRoutePending(true);
     setRouteError(null);
     setRouteName(null);
@@ -162,7 +163,7 @@ export default function App() {
     setRouteRetried(false);
     setRouteTraceId(null);
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch(mode === "agent" ? "/api/agent" : "/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text }),
@@ -247,7 +248,13 @@ export default function App() {
       <div className="workspace">
         <section>
           <h2>Ask</h2>
-          <form className="ask" onSubmit={onRoute}>
+          <form
+            className="ask"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void askRouted("chat");
+            }}
+          >
             <textarea
               rows={3}
               value={routedQuestion}
@@ -266,7 +273,14 @@ export default function App() {
                 </button>
               ))}
               <button type="submit" disabled={routePending || !routedQuestion.trim()}>
-                {routePending ? "Routing…" : "Ask"}
+                {routePending && routeMode === "chat" ? "Routing…" : "Ask"}
+              </button>
+              <button
+                type="button"
+                disabled={routePending || !routedQuestion.trim()}
+                onClick={() => void askRouted("agent")}
+              >
+                {routePending && routeMode === "agent" ? "Choosing tools…" : "Ask with the loop"}
               </button>
             </div>
           </form>

@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** each routed question is a Phoenix trace. The inspector shows the trace id. Open Phoenix at http://localhost:6006 (`phoenix serve`).
+**Where we are:** Ask still uses the keyword router. “Ask with the loop” lets the local model pick docs, SQL, or the graph, look at the result, and pick again. It stops after a few steps.
 
 ## Why not just chat with PDFs?
 
@@ -102,9 +102,9 @@ Try the routed box:
 
 ## Is this agentic RAG?
 
-No. An agent would let a model choose tools, look at the result, and decide whether to call another tool. This project does not do that.
+The **Ask** button is not. A keyword function picks `docs`, `sql`, `graph`, or `mixed`. Mixed always runs graph, then SQL, then docs.
 
-A keyword function picks `docs`, `sql`, `graph`, or `mixed`. Mixed always runs the same three steps in the same order. SQL and the graph fill in templates. Docs search returns chunks. A chat model is optional and only writes a sentence for a docs-only question when `OPENAI_API_KEY` is set.
+**Ask with the loop** is the agent path. `POST /agent` uses LangGraph. The model chooses a tool, reads what came back, and may call another tool. It stops after a few steps. The report card still scores the keyword router, because that path is the stable one.
 
 ## Report card
 

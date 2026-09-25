@@ -1,6 +1,6 @@
 """Nimbus Brain API.
 
-Checkpoint 7: mixed questions run graph, then SQL, then docs.
+/chat uses keyword routing. /agent lets the model pick tools in a loop.
 """
 
 import os
@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.agent import run_agent
 from app.rag.generate import answer_from_evidence, with_dollars
 from app.rag.graph_tool import walk
 from app.rag.mixed import run_mixed
@@ -153,5 +154,24 @@ def chat(req: AskRequest):
                 **result,
             }
 
+        result["phoenix_trace_id"] = trace_id(span)
+        return result
+
+
+@app.post("/agent")
+def agent(req: AskRequest):
+    """The model picks a tool, sees the result, and may pick another."""
+    if not DATABASE_URL:
+        return {"error": "DATABASE_URL is not set"}
+
+    question = req.question.strip()
+    with tracer.start_as_current_span("agent") as span:
+        span.set_attribute("nimbus.route", "agent")
+        span.set_attribute("nimbus.question", question[:300])
+        try:
+            result = run_agent(DATABASE_URL, question)
+        except psycopg.Error as exc:
+            return {"error": f"The agent loop hit a database error: {exc}", "route": "agent"}
+        span.set_attribute("nimbus.steps", ",".join(result.get("steps") or []))
         result["phoenix_trace_id"] = trace_id(span)
         return result
