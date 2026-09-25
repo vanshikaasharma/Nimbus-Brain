@@ -36,8 +36,11 @@ CREATE TABLE doc_chunks (
     doc_path TEXT NOT NULL,
     section TEXT NOT NULL,
     body TEXT NOT NULL,
-    embedding vector({DIM}) NOT NULL
+    embedding vector({DIM}) NOT NULL,
+    tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(body, ''))) STORED
 );
+
+CREATE INDEX doc_chunks_tsv_idx ON doc_chunks USING GIN (tsv);
 """
 
 

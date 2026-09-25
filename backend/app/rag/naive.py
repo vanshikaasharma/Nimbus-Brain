@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-"""Naive RAG: embed the question, take top-k chunks, optionally ask an LLM.
+"""Doc answers: hybrid search, then an optional sentence from those chunks.
 
-This path never looks at invoices or the graph. That is the point.
+This path never looks at invoices or the graph.
 """
 
 import os
@@ -11,35 +11,11 @@ import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 
-from app.rag.embeddings import embed_texts
-
-TOP_K = 3
+from app.rag.retrieve import hybrid_search
 
 
 def search_chunks(conn, question: str) -> list[dict]:
-    query_vec = embed_texts([question])[0]
-    rows = conn.execute(
-        """
-        SELECT
-            doc_path,
-            section,
-            body,
-            1 - (embedding <=> %s::vector) AS score
-        FROM doc_chunks
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s
-        """,
-        (query_vec, query_vec, TOP_K),
-    ).fetchall()
-    return [
-        {
-            "doc_path": row["doc_path"],
-            "section": row["section"],
-            "body": row["body"],
-            "score": float(row["score"]),
-        }
-        for row in rows
-    ]
+    return hybrid_search(conn, question)
 
 
 def generate_answer(question: str, chunks: list[dict]) -> str:
@@ -51,7 +27,7 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
 
     if not api_key:
         return (
-            "Naive search only looked at company docs, not invoices. "
+            "Doc search looked at company docs, not invoices. "
             "Closest passages are below. I did not invent a number. "
             "Set OPENAI_API_KEY if you want a generated answer from these chunks."
         )
@@ -80,7 +56,7 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
     return response.choices[0].message.content or "No answer returned."
 
 
-def ask(database_url: str, question: str) -> dict:
+def ask(database_url: str, question: str, generate: bool = True) -> dict:
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
         register_vector(conn)
         chunks = search_chunks(conn, question)
@@ -92,6 +68,6 @@ def ask(database_url: str, question: str) -> dict:
         }
 
     return {
-        "answer": generate_answer(question, chunks),
+        "answer": generate_answer(question, chunks) if generate else "",
         "chunks": chunks,
     }
