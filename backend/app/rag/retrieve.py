@@ -11,7 +11,6 @@ import psycopg
 from app.rag.embeddings import embed_texts
 
 CANDIDATES = 10
-TOP_K = 3
 RRF_K = 60
 
 
@@ -64,14 +63,13 @@ def hybrid_search(conn, question: str) -> list[dict]:
         FROM fused f
         JOIN doc_chunks c ON c.id = f.id
         ORDER BY f.score DESC
-        LIMIT %(top)s
+        LIMIT %(n)s
         """,
         {
             "vec": query_vec,
             "q": question,
             "n": CANDIDATES,
             "k": RRF_K,
-            "top": TOP_K,
         },
     ).fetchall()
     return [

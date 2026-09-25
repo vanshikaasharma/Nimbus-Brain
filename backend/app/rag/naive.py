@@ -11,11 +11,12 @@ import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 
+from app.rag.rerank import rerank
 from app.rag.retrieve import hybrid_search
 
 
 def search_chunks(conn, question: str) -> list[dict]:
-    return hybrid_search(conn, question)
+    return rerank(question, hybrid_search(conn, question))
 
 
 def generate_answer(question: str, chunks: list[dict]) -> str:
