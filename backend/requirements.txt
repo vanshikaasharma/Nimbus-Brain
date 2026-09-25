@@ -7,3 +7,5 @@ pgvector>=0.3.0
 fastembed>=0.5.0
 sentence-transformers>=3.0.0
 openai>=1.0.0
+arize-phoenix-otel>=0.9.0
+arize-phoenix>=8.0.0

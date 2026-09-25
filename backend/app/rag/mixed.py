@@ -1,7 +1,7 @@
 """Fixed pipeline for a question that needs more than one tool.
 
 Order is always the same: graph, then invoices for those accounts, then the SLA doc.
-No model writes the paragraph. There is no API key in this demo.
+If an API key is set, one model call writes the sentence from that evidence.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from datetime import date, datetime
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.generate import answer_from_evidence, with_dollars
 from app.rag.graph_tool import walk
 from app.rag.naive import ask
 
@@ -68,16 +69,30 @@ def run_mixed(database_url: str, question: str) -> dict:
     graph = walk(database_url, question)
     names = accounts_from_paths(graph.get("paths") or [])
     sql = invoices_for(database_url, names)
-    docs = ask(database_url, SLA_QUERY)
-
+    docs = ask(database_url, SLA_QUERY, generate=False)
+    chunks = docs.get("chunks") or []
+    passages = "\n\n".join(
+        f"[{c['doc_path']} > {c['section']}]\n{c['body']}" for c in chunks
+    )
+    evidence = (
+        "Graph paths:\n"
+        + "\n".join(graph.get("paths") or [])
+        + "\n\nSQL rows:\n"
+        + str(with_dollars(sql.get("rows")))
+        + "\n\nDoc passages:\n"
+        + passages
+    )
+    written = answer_from_evidence(question, evidence)
     listed = ", ".join(names) if names else "none"
-    return {
-        "answer": (
+    if not written:
+        written = (
             f"Ran graph, then SQL, then docs. Accounts on the outage: {listed}. "
             "The SLA chunk and the August invoice rows are the evidence. "
-            "No model wrote this sentence."
-        ),
-        "chunks": docs.get("chunks") or [],
+            "Set OPENAI_API_KEY if you want a sentence written from that evidence."
+        )
+    return {
+        "answer": written,
+        "chunks": chunks,
         "sql": sql,
         "graph": graph,
     }

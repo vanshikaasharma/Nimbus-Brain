@@ -13,11 +13,13 @@ from pydantic import BaseModel, Field
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.generate import answer_from_evidence, with_dollars
 from app.rag.graph_tool import walk
 from app.rag.mixed import run_mixed
 from app.rag.naive import ask
 from app.rag.router import classify
 from app.rag.sql_tool import run_question
+from app.tracing import trace_id, tracer
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -112,20 +114,44 @@ def chat(req: AskRequest):
     if not DATABASE_URL:
         return {"error": "DATABASE_URL is not set"}
 
-    decision = classify(req.question.strip())
-    route = decision["route"]
-    result = {"route": route, "reason": decision["reason"]}
+    question = req.question.strip()
+    with tracer.start_as_current_span("chat") as span:
+        decision = classify(question)
+        route = decision["route"]
+        span.set_attribute("nimbus.route", route)
+        span.set_attribute("nimbus.question", question[:300])
+        result = {
+            "route": route,
+            "reason": decision["reason"],
+            "phoenix_trace_id": trace_id(span),
+        }
 
-    try:
-        if route == "docs":
-            result.update(ask(DATABASE_URL, req.question.strip()))
-        elif route == "sql":
-            result["sql"] = run_question(DATABASE_URL, req.question.strip())
-        elif route == "graph":
-            result["graph"] = walk(DATABASE_URL, req.question.strip())
-        elif route == "mixed":
-            result.update(run_mixed(DATABASE_URL, req.question.strip()))
-    except psycopg.Error as exc:
-        return {"error": f"Routed to {route}, then the database failed: {exc}", **result}
+        try:
+            if route == "docs":
+                result.update(ask(DATABASE_URL, question))
+            elif route == "sql":
+                sql = run_question(DATABASE_URL, question)
+                result["sql"] = sql
+                written = answer_from_evidence(
+                    question,
+                    f"SQL:\n{sql.get('sql')}\nRows:\n{with_dollars(sql.get('rows'))}",
+                )
+                result["answer"] = written or "The rows are the answer. Set OPENAI_API_KEY to turn them into a sentence."
+            elif route == "graph":
+                graph = walk(DATABASE_URL, question)
+                result["graph"] = graph
+                written = answer_from_evidence(
+                    question,
+                    "Paths:\n" + "\n".join(graph.get("paths") or []),
+                )
+                result["answer"] = written or "The paths are the answer. Set OPENAI_API_KEY to turn them into a sentence."
+            elif route == "mixed":
+                result.update(run_mixed(DATABASE_URL, question))
+        except psycopg.Error as exc:
+            return {
+                "error": f"Routed to {route}, then the database failed: {exc}",
+                **result,
+            }
 
-    return result
+        result["phoenix_trace_id"] = trace_id(span)
+        return result

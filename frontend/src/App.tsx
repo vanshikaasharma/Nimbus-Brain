@@ -68,6 +68,7 @@ export default function App() {
   const [routeSqlRows, setRouteSqlRows] = useState<Record<string, unknown>[]>([]);
   const [routePaths, setRoutePaths] = useState<string[]>([]);
   const [routeRetried, setRouteRetried] = useState(false);
+  const [routeTraceId, setRouteTraceId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/health")
@@ -159,6 +160,7 @@ export default function App() {
     setRouteSqlRows([]);
     setRoutePaths([]);
     setRouteRetried(false);
+    setRouteTraceId(null);
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -184,6 +186,7 @@ export default function App() {
       }
       setRoutePaths(data.graph?.paths ?? []);
       setRouteRetried(Boolean(data.retried));
+      setRouteTraceId(data.phoenix_trace_id ?? null);
     } catch {
       setRouteError("Chat failed. Is the API running?");
     } finally {
@@ -278,6 +281,7 @@ export default function App() {
           sql={routeSql}
           rows={routeSqlRows}
           paths={routePaths}
+          traceId={routeTraceId}
         />
       </div>
 

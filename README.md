@@ -4,7 +4,7 @@ Internal Q&A for a **fake** usage-based API company (Nimbus). Employees will typ
 
 This is a school / portfolio project on seeded data, not a production support bot.
 
-**Where we are:** a 10-question report card. Routing, SQL rows, graph names, and doc hits are scored. Vector-only search still misses Acme’s invoice.
+**Where we are:** each routed question is a Phoenix trace. The inspector shows the trace id. Open Phoenix at http://localhost:6006 (`phoenix serve`).
 
 ## Why not just chat with PDFs?
 

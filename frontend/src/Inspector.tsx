@@ -8,6 +8,7 @@ type Props = {
   sql: string | null;
   rows: Record<string, unknown>[];
   paths: string[];
+  traceId: string | null;
 };
 
 function dollars(cents: number) {
@@ -22,7 +23,7 @@ function formatCell(column: string, value: unknown) {
   return String(value);
 }
 
-export function Inspector({ route, reason, retried, chunks, sql, rows, paths }: Props) {
+export function Inspector({ route, reason, retried, chunks, sql, rows, paths, traceId }: Props) {
   return (
     <aside className="inspector">
       <h2>Evidence</h2>
@@ -78,6 +79,19 @@ export function Inspector({ route, reason, retried, chunks, sql, rows, paths }: 
             ))}
           </tbody>
         </table>
+      )}
+
+      <h3>Phoenix</h3>
+      {traceId ? (
+        <p>
+          <a href="http://localhost:6006" target="_blank" rel="noreferrer">
+            localhost:6006
+          </a>
+          <br />
+          <code>{traceId}</code>
+        </p>
+      ) : (
+        <p className="hint">No trace yet. Start Phoenix with phoenix serve.</p>
       )}
 
       <h3>Graph</h3>

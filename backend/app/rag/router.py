@@ -1,7 +1,7 @@
 """Pick one tool for a question.
 
-Checkpoint 6. Keyword rules, not an LLM. If the question needs more than
-one tool, we stop and say so. The agent that combines them comes later.
+Keyword rules, not a model, and not an agent loop. Mixed questions are
+handed to a fixed graph → SQL → docs pipeline.
 """
 
 from __future__ import annotations
