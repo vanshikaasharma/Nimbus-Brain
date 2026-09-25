@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Inspector } from "./Inspector";
+import type { Chunk } from "./types";
 
 type InvoiceRow = {
   id: number;
@@ -7,13 +9,6 @@ type InvoiceRow = {
   period_start: string;
   period_end: string;
   amount_cents: number;
-};
-
-type Chunk = {
-  doc_path: string;
-  section: string;
-  body: string;
-  score: number;
 };
 
 function dollars(cents: number) {
@@ -239,88 +234,52 @@ export default function App() {
         Internal copilot for Nimbus, a fake usage-based API company.
       </p>
       <p>
-        Checkpoint 7: a mixed question runs the graph, then SQL, then the SLA
-        doc. Nothing here is written by a chat model.
+        The answer stays on the left. The right panel is the evidence: route,
+        passages, SQL, and graph path.
       </p>
       <p className="status">
         API status: <strong>{apiStatus}</strong>
       </p>
 
-      <h2>Ask (routed)</h2>
-      <form className="ask" onSubmit={onRoute}>
-        <textarea
-          rows={3}
-          value={routedQuestion}
-          onChange={(e) => setRoutedQuestion(e.target.value)}
-          disabled={routePending}
-        />
-        <div className="ask-actions">
-          {ROUTED_EXAMPLES.map((example) => (
-            <button
-              key={example}
-              type="button"
-              className="ghost"
-              onClick={() => setRoutedQuestion(example)}
-            >
-              {example}
-            </button>
-          ))}
-          <button type="submit" disabled={routePending || !routedQuestion.trim()}>
-            {routePending ? "Routing…" : "Ask"}
-          </button>
-        </div>
-      </form>
-      {routeError && <p className="error">{routeError}</p>}
-      {routeName && (
-        <p className="status">
-          Route: <strong>{routeName}</strong>
-          {routeReason ? ` — ${routeReason}` : ""}
-        </p>
-      )}
-      {routeRetried && (
-        <p className="hint">Retried once after the first passages did not support the question.</p>
-      )}
-      {routeAnswer && <p className="answer">{routeAnswer}</p>}
-      {routeChunks.length > 0 && (
-        <ul className="chunks">
-          {routeChunks.map((chunk) => (
-            <li key={`${chunk.doc_path}-${chunk.section}`}>
-              <code>
-                {chunk.doc_path} &gt; {chunk.section}
-              </code>
-              <pre>{chunk.body}</pre>
-            </li>
-          ))}
-        </ul>
-      )}
-      {routeSql && <pre className="sql">{routeSql}</pre>}
-      {routeSqlRows.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              {Object.keys(routeSqlRows[0]).map((col) => (
-                <th key={col}>{col}</th>
+      <div className="workspace">
+        <section>
+          <h2>Ask</h2>
+          <form className="ask" onSubmit={onRoute}>
+            <textarea
+              rows={3}
+              value={routedQuestion}
+              onChange={(e) => setRoutedQuestion(e.target.value)}
+              disabled={routePending}
+            />
+            <div className="ask-actions">
+              {ROUTED_EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  className="ghost"
+                  onClick={() => setRoutedQuestion(example)}
+                >
+                  {example}
+                </button>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {routeSqlRows.map((row, index) => (
-              <tr key={index}>
-                {Object.keys(routeSqlRows[0]).map((col) => (
-                  <td key={col}>{formatCell(col, row[col])}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {routePaths.length > 0 && (
-        <ul className="paths">
-          {routePaths.map((path) => (
-            <li key={path}>{path}</li>
-          ))}
-        </ul>
-      )}
+              <button type="submit" disabled={routePending || !routedQuestion.trim()}>
+                {routePending ? "Routing…" : "Ask"}
+              </button>
+            </div>
+          </form>
+          {routeError && <p className="error">{routeError}</p>}
+          {routeAnswer && <p className="answer">{routeAnswer}</p>}
+        </section>
+        <Inspector
+          route={routeName}
+          reason={routeReason}
+          retried={routeRetried}
+          chunks={routeChunks}
+          sql={routeSql}
+          rows={routeSqlRows}
+          paths={routePaths}
+        />
+      </div>
 
       <h2>Call a tool yourself</h2>
       <h2>Ask the docs</h2>
