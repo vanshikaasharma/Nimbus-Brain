@@ -24,7 +24,8 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
     """Use OpenAI if a key is set; otherwise just point at the passages."""
     api_key = os.environ.get("OPENAI_API_KEY")
     passages = "\n\n".join(
-        f"[{c['doc_path']} > {c['section']}]\n{c['body']}" for c in chunks
+        f"[D{index}] {chunk['doc_path']} > {chunk['section']}\n{chunk['body']}"
+        for index, chunk in enumerate(chunks, start=1)
     )
 
     if not api_key:
@@ -45,8 +46,9 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
             {
                 "role": "system",
                 "content": (
-                    "Answer using only the passages. If they do not contain the "
-                    "answer, say you do not know. Do not invent numbers."
+                    "Answer using only the passages. Cite each fact with its source id, "
+                    "such as [D1]. If they do not contain the answer, say you do not know. "
+                    "Do not invent numbers."
                 ),
             },
             {
@@ -55,7 +57,15 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
             },
         ],
     )
-    return response.choices[0].message.content or "No answer returned."
+    from app.rag.generate import review_answer
+
+    text = (response.choices[0].message.content or "").strip() or "No answer returned."
+    checked, _flags = review_answer(
+        text,
+        {f"D{index}" for index in range(1, len(chunks) + 1)},
+        passages,
+    )
+    return checked
 
 
 def ask(database_url: str, question: str, generate: bool = True) -> dict:

@@ -110,21 +110,26 @@ def draft_plan(question: str) -> dict | None:
     api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not api_key:
         return None
-    from openai import OpenAI
+    from openai import APIConnectionError, APITimeoutError, OpenAI
 
     client = OpenAI(
         api_key=api_key,
         base_url=os.environ.get("OPENAI_BASE_URL") or None,
+        timeout=45.0,
     )
     model = os.environ.get("OPENAI_CHAT_MODEL", "llama3.2")
-    response = client.chat.completions.create(
-        model=model,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": PLAN_SYSTEM},
-            {"role": "user", "content": question},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0,
+            max_tokens=180,
+            messages=[
+                {"role": "system", "content": PLAN_SYSTEM},
+                {"role": "user", "content": question},
+            ],
+        )
+    except (APITimeoutError, APIConnectionError):
+        return None
     return parse_plan(response.choices[0].message.content or "")
 
 

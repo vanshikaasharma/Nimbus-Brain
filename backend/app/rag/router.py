@@ -66,27 +66,32 @@ def classify(question: str) -> dict:
             "reason": (
                 "This question needs more than one tool ("
                 + " + ".join(hits)
-                + "), so the fixed pipeline runs graph, then SQL, then docs."
+                + ")."
             ),
+            "tools": hits,
         }
     if hits == ["docs"]:
         return {
             "route": "docs",
             "reason": "Looks like a policy or product question, so search the docs.",
+            "tools": hits,
         }
     if hits == ["sql"]:
         return {
             "route": "sql",
             "reason": "Looks like a number or membership question, so query the tables.",
+            "tools": hits,
         }
     if hits == ["graph"]:
         return {
             "route": "graph",
             "reason": "Looks like an incident relationship, so walk the graph.",
+            "tools": hits,
         }
     return {
         "route": "unknown",
         "reason": "No rule matched. Try a rate-limit, invoice, or INC-104 question.",
+        "tools": hits,
     }
 
 
@@ -113,21 +118,26 @@ def draft_route(question: str) -> str | None:
     api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not api_key:
         return None
-    from openai import OpenAI
+    from openai import APIConnectionError, APITimeoutError, OpenAI
 
     client = OpenAI(
         api_key=api_key,
         base_url=os.environ.get("OPENAI_BASE_URL") or None,
+        timeout=45.0,
     )
     model = os.environ.get("OPENAI_CHAT_MODEL", "llama3.2")
-    response = client.chat.completions.create(
-        model=model,
-        temperature=0,
-        messages=[
-            {"role": "system", "content": ROUTE_SYSTEM},
-            {"role": "user", "content": question},
-        ],
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            temperature=0,
+            max_tokens=40,
+            messages=[
+                {"role": "system", "content": ROUTE_SYSTEM},
+                {"role": "user", "content": question},
+            ],
+        )
+    except (APITimeoutError, APIConnectionError):
+        return None
     return parse_route(response.choices[0].message.content or "")
 
 
