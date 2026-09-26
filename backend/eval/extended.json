@@ -1,0 +1,54 @@
+{
+  "questions": [
+    {
+      "id": "paraphrase-pro",
+      "question": "How many requests per second does the Pro plan allow?",
+      "route": "docs",
+      "expect_doc": "pricing.md",
+      "note": "Paraphrase with none of the keyword router's doc words."
+    },
+    {
+      "id": "paraphrase-acme-pay",
+      "question": "What did Acme pay in August 2026?",
+      "route": "sql",
+      "expect_cents": 347000,
+      "note": "Paraphrase with none of the invoice keywords. August 2026 is explicit."
+    },
+    {
+      "id": "hooli-july",
+      "question": "What was Hooli's bill in July 2026?",
+      "route": "sql",
+      "expect_cents": 9900,
+      "note": "Customer that is not in the original 10."
+    },
+    {
+      "id": "acme-july-2026",
+      "question": "What was Acme's invoice in July 2026?",
+      "route": "sql",
+      "expect_cents": 210000,
+      "note": "Historical month, not last month."
+    },
+    {
+      "id": "acme-missing-2019",
+      "question": "What was Acme's invoice in January 2019?",
+      "route": "sql",
+      "expect_rows": 0,
+      "note": "Seeded data has no 2019 invoice."
+    },
+    {
+      "id": "reverse-soylent",
+      "question": "Which incident is linked to Soylent?",
+      "route": "graph",
+      "expect_names": ["Soylent", "INC-104"],
+      "expect_direction": "reverse",
+      "note": "Reverse hop from an account back to the incident."
+    },
+    {
+      "id": "mixed-two-tools",
+      "question": "Which accounts did INC-104 affect, and what were their August 2026 invoices?",
+      "route": "mixed",
+      "expect_tools": ["graph", "sql"],
+      "note": "Mixed question that does not need the docs."
+    }
+  ]
+}
