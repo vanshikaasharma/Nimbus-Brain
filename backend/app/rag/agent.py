@@ -29,8 +29,9 @@ SYSTEM = (
     "walk_graph is for incidents and which accounts an outage hit. "
     "Call a tool when you need a fact. You may call more than one, then stop. "
     "If a row has amount_dollars, that number is the invoice total. "
-    "If the tools do not contain the answer, say you do not know. "
-    "Do not invent customers, dollar amounts, or SLA terms."
+    "If the tools do not contain the answer, say you do not know and what is missing. "
+    "Cite source ids from the tool text, and the page number when one is shown. "
+    "Do not invent customers, dollar amounts, pages, or SLA terms."
 )
 
 
@@ -78,9 +79,11 @@ def run_agent(database_url: str, question: str) -> dict:
         found["chunks"] = chunks
         if result.get("abstained") or not chunks:
             return "No supporting passage in the Nimbus docs."
+        from app.rag.generate import chunk_evidence
+
         lines = []
-        for chunk in chunks[:3]:
-            lines.append(f"{chunk['doc_path']} > {chunk['section']}\n{chunk['body'][:500]}")
+        for index, chunk in enumerate(chunks[:3], start=1):
+            lines.append(f"[D{index}] {chunk_evidence(chunk)}")
         return "\n\n".join(lines)
 
     @tool

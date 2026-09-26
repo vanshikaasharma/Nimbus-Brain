@@ -23,8 +23,10 @@ def search_chunks(conn, question: str) -> list[dict]:
 def generate_answer(question: str, chunks: list[dict]) -> str:
     """Use OpenAI if a key is set; otherwise just point at the passages."""
     api_key = os.environ.get("OPENAI_API_KEY")
+    from app.rag.generate import chunk_evidence
+
     passages = "\n\n".join(
-        f"[D{index}] {chunk['doc_path']} > {chunk['section']}\n{chunk['body']}"
+        f"[D{index}] {chunk_evidence(chunk)}"
         for index, chunk in enumerate(chunks, start=1)
     )
 

@@ -15,7 +15,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.rag.dates import period_for_question
-from app.rag.generate import answer_with_sources, with_dollars
+from app.rag.generate import answer_with_sources, chunk_evidence, with_dollars
 from app.rag.grade import rewrite_once
 from app.rag.graph_tool import walk
 from app.rag.naive import ask
@@ -201,8 +201,7 @@ def run_mixed(database_url: str, question: str) -> dict:
     for index, row in enumerate(with_dollars((sql or {}).get("rows")), start=1):
         sources.append((f"S{index}", str(row)))
     for index, chunk in enumerate(chunks, start=1):
-        body = (chunk.get("body") or "")[:500]
-        sources.append((f"D{index}", f"{chunk['doc_path']} > {chunk['section']}\n{body}"))
+        sources.append((f"D{index}", chunk_evidence(chunk)))
 
     written, flags = answer_with_sources(question, sources)
     if not written:

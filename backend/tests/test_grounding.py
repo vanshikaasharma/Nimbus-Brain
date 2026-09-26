@@ -1,0 +1,57 @@
+"""Citation and evidence checks. No model and no database."""
+
+from __future__ import annotations
+
+import unittest
+
+from app.rag.generate import chunk_evidence, review_answer
+
+
+EVIDENCE = (
+    "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}\n"
+    "[D1] sla-enterprise.md#Credits > Credits\nTen percent."
+)
+
+
+class GroundingTests(unittest.TestCase):
+    def test_pdf_chunk_keeps_source_id_and_page(self):
+        text = chunk_evidence(
+            {
+                "source_id": "credit-policy.pdf#p1",
+                "page_number": 1,
+                "section": "Credits",
+                "body": "Ten percent.",
+            }
+        )
+        self.assertIn("credit-policy.pdf#p1", text)
+        self.assertIn("page 1", text)
+
+    def test_unknown_source_id_is_flagged(self):
+        _answer, flags = review_answer("Acme owes $3470 [D9].", {"S1", "D1"}, EVIDENCE)
+        self.assertTrue(any("D9" in flag for flag in flags))
+
+    def test_missing_citation_is_a_format_check(self):
+        _answer, flags = review_answer("Acme owes $3470.", {"S1"}, EVIDENCE)
+        self.assertTrue(any(flag.startswith("Citation check:") for flag in flags))
+
+    def test_page_not_in_evidence_is_flagged(self):
+        _answer, flags = review_answer("See page 9 [D1].", {"D1"}, EVIDENCE)
+        self.assertTrue(any("page 9" in flag for flag in flags))
+
+    def test_customer_missing_from_evidence_is_flagged(self):
+        _answer, flags = review_answer("Globex owes $3470 [S1].", {"S1"}, EVIDENCE)
+        self.assertTrue(any("Globex" in flag for flag in flags))
+
+    def test_wrong_total_for_a_named_customer_is_a_contradiction(self):
+        evidence = "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}"
+        _answer, flags = review_answer("Acme was $2180 [S1].", {"S1"}, evidence)
+        self.assertTrue(any("assigns Acme" in flag for flag in flags))
+
+    def test_a_cited_answer_is_not_called_fully_verified(self):
+        answer, flags = review_answer("Acme was $3470 [S1].", {"S1"}, EVIDENCE)
+        self.assertEqual(flags, [])
+        self.assertNotIn("hallucination", answer.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()
