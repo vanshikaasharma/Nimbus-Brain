@@ -81,7 +81,7 @@ def _money(text: str) -> set[str]:
     found = set()
     patterns = (
         r"\$\s?\d[\d,]*(?:\.\d+)?",
-        r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b",
+        r"\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b(?!\s*cents)",
         r"amount_dollars': '(\d+(?:\.\d+)?)'",
     )
     for pattern in patterns:

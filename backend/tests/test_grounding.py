@@ -47,6 +47,14 @@ class GroundingTests(unittest.TestCase):
         _answer, flags = review_answer("Acme was $2180 [S1].", {"S1"}, evidence)
         self.assertTrue(any("assigns Acme" in flag for flag in flags))
 
+    def test_cent_figure_next_to_the_dollar_total_is_not_a_second_amount(self):
+        evidence = "[S1] {'name': 'Acme', 'amount_cents': 210000, 'amount_dollars': '2100.00'}"
+        answer = (
+            "Acme's invoice in July 2026 was 210,000 cents, which is $2100. [S1]"
+        )
+        _text, flags = review_answer(answer, {"S1"}, evidence)
+        self.assertEqual(flags, [])
+
     def test_a_cited_answer_is_not_called_fully_verified(self):
         answer, flags = review_answer("Acme was $3470 [S1].", {"S1"}, EVIDENCE)
         self.assertEqual(flags, [])
