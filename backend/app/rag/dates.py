@@ -1,7 +1,7 @@
 """Turn 'last month' and named months into an invoice period_start.
 
-APP_TIMEZONE defaults to America/Los_Angeles. Tests pass an explicit day
-so they do not depend on the clock.
+APP_TIMEZONE defaults to America/Vancouver. Set the env var to use another zone.
+Tests pass an explicit day so they do not depend on the clock.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ MONTHS = {
 
 
 def timezone_name() -> str:
-    return os.environ.get("APP_TIMEZONE", "America/Los_Angeles")
+    return os.environ.get("APP_TIMEZONE", "America/Vancouver")
 
 
 def app_today(today: date | None = None, now: datetime | None = None) -> date:

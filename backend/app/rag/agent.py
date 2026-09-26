@@ -7,6 +7,7 @@ It stops after a few steps so a small local model cannot run forever.
 from __future__ import annotations
 
 import os
+import re
 
 from langchain_core.messages import AIMessage
 from langchain_core.tools import tool
@@ -19,18 +20,22 @@ from app.rag.graph_tool import walk
 from app.rag.naive import ask
 from app.rag.sql_tool import run_question
 
-# Each tool call is two graph steps (model, then tool). Three calls fit under this.
-MAX_STEPS = 10
+# Each tool call is two graph steps (model, then tool). Graph, SQL, and a final
+# sentence fit under this. The loop also stops if the model writes prose instead
+# of a tool call; run_agent then calls at most the tools still missing.
+MAX_STEPS = 12
 
 SYSTEM = (
     "You are Nimbus Brain. Answer only from tool results. "
     "search_docs is for pricing, the SLA, the changelog, rate limits, and credits. "
-    "lookup_invoices is for invoices, bills, and which customers are on a plan. "
-    "walk_graph is for incidents and which accounts an outage hit. "
-    "Call a tool when you need a fact. You may call more than one, then stop. "
+    "lookup_invoices is for invoices, bills, what a customer paid, and which customers are on a plan. "
+    "walk_graph is for incidents and which accounts an outage hit. It does not return invoices. "
+    "Plan membership is lookup_invoices, not walk_graph. "
+    "Call a tool when you need a fact. If the question still has an unanswered part, call the next tool. "
+    "Do not say you will call a tool. Call it. Do not call a tool the question does not need. "
     "If a row has amount_dollars, that number is the invoice total. "
     "If the tools do not contain the answer, say you do not know and what is missing. "
-    "Cite source ids from the tool text, and the page number when one is shown. "
+    "Cite source ids from the tool text, such as [G1] or [S1], and the page number when one is shown. "
     "Do not invent customers, dollar amounts, pages, or SLA terms."
 )
 
@@ -88,25 +93,37 @@ def run_agent(database_url: str, question: str) -> dict:
 
     @tool
     def lookup_invoices(query: str) -> str:
-        """Look up invoices or which customers are on a plan. Read-only."""
+        """Look up invoices, bills, or which customers are on a plan. Pass every account name."""
+        from app.rag.dates import period_for_question
+        from app.rag.mixed import invoices_for
+        from app.rag.sql_tool import CUSTOMER_NAMES
+
         found["steps"].append("sql")
-        result = run_question(database_url, query)
+        names = [name for name in CUSTOMER_NAMES if name.lower() in query.lower()]
+        if len(names) >= 2:
+            result = invoices_for(database_url, names, period=period_for_question(query))
+        else:
+            result = run_question(database_url, query)
         found["sql"] = result
         if result.get("error"):
             return result["error"]
         rows = with_dollars(result.get("rows"))
-        return f"SQL:\n{result.get('sql')}\nRows:\n{rows}"
+        if not rows:
+            return "No invoice rows."
+        return "\n".join(f"[S{index}] {row}" for index, row in enumerate(rows, start=1))
 
     @tool
     def walk_graph(query: str) -> str:
-        """Walk incident INC-104 to the accounts it hit and their plans."""
+        """Walk an incident to the accounts it hit. Does not return invoices."""
         found["steps"].append("graph")
         result = walk(database_url, query)
         found["graph"] = result
         if result.get("error"):
             return result["error"]
         paths = result.get("paths") or []
-        return "\n".join(paths) if paths else "No path."
+        if not paths:
+            return "No path."
+        return "\n".join(f"[G{index}] {path}" for index, path in enumerate(paths, start=1))
 
     model = ChatOpenAI(
         model=os.environ.get("OPENAI_CHAT_MODEL", "llama3.2"),
@@ -137,11 +154,55 @@ def run_agent(database_url: str, question: str) -> dict:
         if isinstance(message, AIMessage) and not message.tool_calls:
             answer = _text(message)
 
+    from app.rag.coverage import unanswered_tools
+    from app.rag.generate import answer_with_sources, chunk_evidence, review_answer
+    from app.rag.mixed import accounts_from_paths
+
+    added = False
+    for missing in unanswered_tools(question, found["steps"]):
+        added = True
+        if missing == "sql":
+            names = accounts_from_paths((found.get("graph") or {}).get("paths") or [])
+            query = question if not names else question + " Accounts: " + ", ".join(names)
+            lookup_invoices.invoke({"query": query})
+        elif missing == "docs":
+            search_docs.invoke({"query": question})
+        elif missing == "graph":
+            walk_graph.invoke({"query": question})
+
+    sources = []
+    for index, path in enumerate((found.get("graph") or {}).get("paths") or [], start=1):
+        sources.append((f"G{index}", path))
+    for index, row in enumerate(with_dollars((found.get("sql") or {}).get("rows")), start=1):
+        sources.append((f"S{index}", str(row)))
+    for index, chunk in enumerate(found.get("chunks") or [], start=1):
+        sources.append((f"D{index}", chunk_evidence(chunk)))
+
+    grounding: list[str] = []
+    cited = bool(re.search(r"\[[GSD]\d+\]", answer or ""))
+    if sources and (added or not cited):
+        written, grounding = answer_with_sources(question, sources)
+        if written:
+            answer = written
+        elif added:
+            answer = (
+                "Retrieved the missing evidence, but no sentence was written. "
+                "The tool results are the evidence."
+            )
+    elif sources and answer:
+        answer, grounding = review_answer(
+            answer,
+            {sid for sid, _ in sources},
+            "\n".join(f"[{sid}] {text}" for sid, text in sources),
+        )
+
     steps = found["steps"]
     if steps:
         reason = "The model called " + " → ".join(steps) + "."
     else:
         reason = "The model did not call a tool."
+    if added:
+        reason += " A tool the question still needed was called once before the answer."
     if stopped_early:
         reason += " Stopped after the step limit."
 
@@ -153,5 +214,6 @@ def run_agent(database_url: str, question: str) -> dict:
         "chunks": found["chunks"],
         "sql": found["sql"],
         "graph": found["graph"],
-        "retried": found["retried"],
+        "retried": found["retried"] or added,
+        "grounding": grounding,
     }

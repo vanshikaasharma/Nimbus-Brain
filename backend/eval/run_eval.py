@@ -161,7 +161,7 @@ def run_llm(url: str) -> None:
         llama = picked["route"]
         keyword_ok += int(keyword == item["route"])
         llama_ok += int(llama == item["route"])
-        if "Keyword rules chose this" in picked.get("reason", ""):
+        if picked.get("fallback"):
             fallback_used += 1
         mark = "ok" if llama == item["route"] else "MISS"
         print(
@@ -193,9 +193,12 @@ def run_llm(url: str) -> None:
             else:
                 print(f"  {item['id']}: sql match={match} error={result.get('error')}")
             if item["id"] == "acme-july-2026" and rows and not result.get("error"):
-                from app.rag.generate import answer_with_sources
+                from app.rag.generate import answer_with_sources, with_dollars
 
-                sources = [(f"S{index}", str(row)) for index, row in enumerate(rows, start=1)]
+                sources = [
+                    (f"S{index}", str(row))
+                    for index, row in enumerate(with_dollars(rows), start=1)
+                ]
                 written, flags = answer_with_sources(item["question"], sources)
                 print(f"    model answer: {written}")
                 print(f"    citation/evidence flags: {flags or 'none'}")
@@ -240,8 +243,8 @@ def run_llm(url: str) -> None:
             result = run_mixed(url, item["question"])
             print(
                 f"  {item['id']}: fixed={fixed} dynamic={dynamic} "
-                f"ran={result.get('steps')} missing={result.get('missing')} "
-                f"flags={result.get('grounding')}"
+                f"planner={result.get('planner')} ran={result.get('steps')} "
+                f"missing={result.get('missing')} flags={result.get('grounding')}"
             )
             if not dynamic_match:
                 failures.append(f"{item['id']}: dynamic steps {dynamic}, expected {expected}")

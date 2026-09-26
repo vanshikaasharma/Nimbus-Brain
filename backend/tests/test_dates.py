@@ -7,7 +7,7 @@ import unittest
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.rag.dates import app_today, period_for_question
+from app.rag.dates import app_today, period_for_question, timezone_name
 from app.rag.sql_tool import draft_sql_without_llm
 
 
@@ -36,18 +36,28 @@ class PeriodTests(unittest.TestCase):
         got = period_for_question("December invoice", today=date(2026, 1, 10))
         self.assertEqual(got, date(2025, 12, 1))
 
-    def test_timezone_can_move_the_calendar_day(self):
-        previous = os.environ.get("APP_TIMEZONE")
-        os.environ["APP_TIMEZONE"] = "America/Los_Angeles"
+    def test_default_timezone_is_vancouver(self):
+        previous = os.environ.pop("APP_TIMEZONE", None)
         try:
-            # 06:30 UTC on 1 Sep is still 31 Aug in Los Angeles (UTC-7).
+            self.assertEqual(timezone_name(), "America/Vancouver")
+            # 06:30 UTC on 1 Sep is still 31 Aug in Vancouver (PDT, UTC-7).
+            got = app_today(now=datetime(2026, 9, 1, 6, 30, tzinfo=ZoneInfo("UTC")))
+        finally:
+            if previous is not None:
+                os.environ["APP_TIMEZONE"] = previous
+        self.assertEqual(got, date(2026, 8, 31))
+
+    def test_timezone_override_is_honored(self):
+        previous = os.environ.get("APP_TIMEZONE")
+        os.environ["APP_TIMEZONE"] = "UTC"
+        try:
             got = app_today(now=datetime(2026, 9, 1, 6, 30, tzinfo=ZoneInfo("UTC")))
         finally:
             if previous is None:
                 os.environ.pop("APP_TIMEZONE", None)
             else:
                 os.environ["APP_TIMEZONE"] = previous
-        self.assertEqual(got, date(2026, 8, 31))
+        self.assertEqual(got, date(2026, 9, 1))
 
 
 class SqlTemplateTests(unittest.TestCase):
@@ -58,6 +68,13 @@ class SqlTemplateTests(unittest.TestCase):
         )
         self.assertIsNotNone(sql)
         self.assertNotIn("2026-08-01", sql)
+        self.assertEqual(params, ["Acme", date(2026, 8, 1)])
+
+    def test_pay_paraphrase_uses_the_named_month(self):
+        _sql, _explanation, params = draft_sql_without_llm(
+            "What did Acme pay in August 2026?",
+            today=date(2027, 2, 1),
+        )
         self.assertEqual(params, ["Acme", date(2026, 8, 1)])
 
     def test_explicit_august_2026_stays_selectable(self):

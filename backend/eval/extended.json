@@ -49,6 +49,47 @@
       "route": "mixed",
       "expect_tools": ["graph", "sql"],
       "note": "Mixed question that does not need the docs."
+    },
+    {
+      "id": "paraphrase-spend",
+      "question": "What did Initech spend in July 2026?",
+      "route": "sql",
+      "expect_cents": 49900,
+      "note": "Unseen pay paraphrase. Not one of the original routing misses."
+    },
+    {
+      "id": "paraphrase-subscribers",
+      "question": "List the Enterprise subscribers.",
+      "route": "sql",
+      "expect_names": ["Acme", "Soylent"],
+      "note": "Plan membership without the keyword router's who/which/customer words."
+    },
+    {
+      "id": "private-text",
+      "question": "Did someone text Hooli a private discount?",
+      "route": "unknown",
+      "note": "Unrelated to docs, tables, and the incident graph."
+    },
+    {
+      "id": "mixed-graph-docs",
+      "question": "What credit does the SLA require after an outage, and which accounts were on INC-104?",
+      "route": "mixed",
+      "expect_tools": ["graph", "docs"],
+      "note": "Graph plus docs, no invoices."
+    },
+    {
+      "id": "mixed-sql-docs",
+      "question": "What was Soylent's bill in July 2026, and what does the SLA say about credits?",
+      "route": "mixed",
+      "expect_tools": ["sql", "docs"],
+      "note": "SQL plus docs, no graph."
+    },
+    {
+      "id": "mixed-three-tools",
+      "question": "Which accounts did the ingest outage hit, what does the SLA say we owe them, and what were their August 2026 invoices?",
+      "route": "mixed",
+      "expect_tools": ["graph", "sql", "docs"],
+      "note": "All three tools."
     }
   ]
 }

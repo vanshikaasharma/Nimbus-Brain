@@ -17,6 +17,9 @@ class ExtendedLabelTests(unittest.TestCase):
         by_id = {item["id"]: item["question"] for item in questions}
         self.assertEqual(classify(by_id["paraphrase-pro"])["route"], "unknown")
         self.assertEqual(classify(by_id["paraphrase-acme-pay"])["route"], "unknown")
+        self.assertEqual(classify(by_id["paraphrase-spend"])["route"], "unknown")
+        self.assertEqual(classify(by_id["paraphrase-subscribers"])["route"], "unknown")
+        self.assertEqual(classify(by_id["private-text"])["route"], "unknown")
 
     def test_historical_and_missing_dates_still_look_like_sql(self):
         questions = json.loads(EXTENDED.read_text())["questions"]

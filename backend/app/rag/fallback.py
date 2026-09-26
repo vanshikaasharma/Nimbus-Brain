@@ -35,7 +35,7 @@ def gaps(route: str, result: dict) -> list[str]:
 def other_tool(question: str, route: str) -> str | None:
     """Another tool only when the question asks for one kind of evidence."""
     q = question.lower()
-    asks_invoice = any(word in q for word in ("invoice", "bill", "charged"))
+    asks_invoice = any(word in q for word in ("invoice", "bill", "charged", "pay", "paid", "spent", "spend"))
     asks_graph = any(word in q for word in ("inc-", "incident", "outage"))
     asks_docs = any(word in q for word in ("sla", "rate limit", "pricing", "credit", "owe"))
     kinds = sum([asks_invoice, asks_graph, asks_docs])

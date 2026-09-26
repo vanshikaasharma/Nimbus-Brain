@@ -14,7 +14,7 @@ from decimal import Decimal
 import psycopg
 from psycopg.rows import dict_row
 
-from app.rag.dates import app_today, period_for_question
+from app.rag.dates import app_today, period_for_question, timezone_name
 
 ALLOWED_TABLES = {"plans", "customers", "invoices"}
 FORBIDDEN = re.compile(
@@ -67,7 +67,7 @@ def draft_sql_without_llm(
     q = question.lower()
     customer = next((name for name in CUSTOMER_NAMES if name.lower() in q), None)
 
-    if customer and any(word in q for word in ("invoice", "bill", "charged", "usage")):
+    if customer and any(word in q for word in ("invoice", "bill", "charged", "usage", "pay", "paid", "spent", "spend")):
         sql = """
 SELECT c.name, i.period_start, i.period_end, i.amount_cents
 FROM invoices i
@@ -82,7 +82,7 @@ WHERE c.name = %s
         sql += "\nORDER BY i.period_start DESC"
         return sql, f"Matched the invoice template for {customer}.", params
 
-    if "enterprise" in q and any(word in q for word in ("who", "which", "customer", "account")):
+    if "enterprise" in q and any(word in q for word in ("who", "which", "customer", "account", "subscriber")):
         sql = """
 SELECT c.name, p.name AS plan
 FROM customers c
@@ -120,7 +120,7 @@ def draft_sql_with_llm(question: str, today: date | None = None) -> tuple[str, s
                     "Write one PostgreSQL SELECT for the Nimbus tables. "
                     "No markdown. No comments. SELECT only.\n"
                     f"Schema:\n{SCHEMA}\n"
-                    f"Today is {current.isoformat()} in timezone {os.environ.get('APP_TIMEZONE', 'America/Los_Angeles')}. "
+                    f"Today is {current.isoformat()} in timezone {timezone_name()}. "
                     f"{period_note}\n"
                     "Example shape:\n"
                     "SELECT c.name, i.period_start, i.period_end, i.amount_cents "

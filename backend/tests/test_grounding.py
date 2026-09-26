@@ -55,6 +55,41 @@ class GroundingTests(unittest.TestCase):
         _text, flags = review_answer(answer, {"S1"}, evidence)
         self.assertEqual(flags, [])
 
+    def test_partial_answer_leaves_out_a_second_total(self):
+        evidence = (
+            "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}\n"
+            "[S2] {'name': 'Soylent', 'amount_dollars': '2180.00'}"
+        )
+        _answer, flags = review_answer("Acme was $3470 [S1].", {"S1", "S2"}, evidence)
+        self.assertTrue(any("more than one total" in flag for flag in flags))
+        self.assertFalse(any("disagree" in flag for flag in flags))
+
+    def test_contradictory_evidence_must_be_mentioned(self):
+        evidence = (
+            "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}\n"
+            "[S2] {'name': 'Acme', 'amount_dollars': '2100.00'}"
+        )
+        _answer, flags = review_answer("Acme was $3470 [S1].", {"S1", "S2"}, evidence)
+        self.assertTrue(any("disagree" in flag for flag in flags))
+
+    def test_one_rewrite_uses_the_same_evidence(self):
+        from app.rag.generate import answer_with_sources
+
+        calls = []
+
+        def write(question, evidence):
+            calls.append((question, evidence))
+            if len(calls) == 1:
+                return "Acme owes $9999."
+            return "Acme was $3470 [S1]."
+
+        evidence_row = "{'name': 'Acme', 'amount_dollars': '3470.00'}"
+        answer, flags = answer_with_sources("What was Acme's invoice?", [("S1", evidence_row)], write=write)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][1], calls[1][1])
+        self.assertIn("[S1]", answer)
+        self.assertEqual(flags, [])
+
     def test_a_cited_answer_is_not_called_fully_verified(self):
         answer, flags = review_answer("Acme was $3470 [S1].", {"S1"}, EVIDENCE)
         self.assertEqual(flags, [])

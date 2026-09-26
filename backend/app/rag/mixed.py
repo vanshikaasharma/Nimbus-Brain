@@ -30,9 +30,35 @@ SLA_QUERY = "Enterprise SLA credit after an ingest outage"
 PLAN_SYSTEM = """
 Choose the tools this question needs, in the order to run them. Reply with JSON only.
 Tools are graph, sql, and docs. Include only the ones the question needs.
-Put graph before sql when the invoice depends on accounts named by the graph.
+graph: who an incident or outage hit.
+sql: invoices or bills, including invoices for the accounts the graph just named.
+docs: SLA, credits, pricing, rate limits.
+When both graph and sql are needed, put graph first so SQL receives the account names.
+Do not add a tool the question does not ask for.
+
+{"steps":["graph","sql"]}
+{"steps":["graph","docs"]}
+{"steps":["sql","docs"]}
 {"steps":["graph","sql","docs"]}
 """
+
+TOOL_ALIASES = {
+    "graph": "graph",
+    "walk": "graph",
+    "walk_graph": "graph",
+    "incident": "graph",
+    "sql": "sql",
+    "invoice": "sql",
+    "invoices": "sql",
+    "bill": "sql",
+    "bills": "sql",
+    "lookup_invoices": "sql",
+    "docs": "docs",
+    "doc": "docs",
+    "document": "docs",
+    "documents": "docs",
+    "search_docs": "docs",
+}
 
 
 def accounts_from_paths(paths: list[str]) -> list[str]:
@@ -95,28 +121,51 @@ WHERE c.name = ANY(%s)
     }
 
 
+def _alias(name: str) -> str | None:
+    return TOOL_ALIASES.get(name.lower().strip().replace(" ", "_"))
+
+
 def parse_steps(text: str) -> list[str] | None:
+    """Read a tool list. Unknown tokens are dropped; a synonym still counts."""
     body = text.strip()
+    raw = None
     start = body.find("{")
     end = body.rfind("}")
-    if start < 0 or end <= start:
-        return None
-    try:
-        raw = json.loads(body[start : end + 1]).get("steps")
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(raw, list) or not raw:
-        return None
+    if start >= 0 and end > start:
+        try:
+            raw = json.loads(body[start : end + 1]).get("steps")
+        except json.JSONDecodeError:
+            raw = None
+    if isinstance(raw, str):
+        raw = re.split(r"[,>|]+", raw)
     steps = []
-    for item in raw:
-        if not isinstance(item, str):
-            return None
-        name = item.lower().strip()
-        if name not in TOOLS or name in steps:
-            return None
-        steps.append(name)
-    if len(steps) > 3:
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, str):
+                continue
+            name = _alias(item)
+            if name and name not in steps:
+                steps.append(name)
+    if not steps:
+        for match in re.finditer(
+            r"\b(walk_graph|lookup_invoices|search_docs|graph|sql|docs|invoices|invoice|documents|document)\b",
+            body,
+            flags=re.I,
+        ):
+            name = _alias(match.group(1))
+            if name and name not in steps:
+                steps.append(name)
+    if not steps or len(steps) > 3:
         return None
+    return steps
+
+
+def order_steps(steps: list[str], question: str) -> list[str]:
+    """Graph names the accounts before SQL looks up their invoices."""
+    del question
+    if "graph" in steps and "sql" in steps:
+        rest = [name for name in steps if name not in ("graph", "sql")]
+        return ["graph", "sql", *rest]
     return steps
 
 
@@ -144,7 +193,17 @@ def draft_steps(question: str) -> list[str] | None:
         )
     except (APITimeoutError, APIConnectionError):
         return None
-    return parse_steps(response.choices[0].message.content or "")
+    parsed = parse_steps(response.choices[0].message.content or "")
+    if not parsed:
+        return None
+    from app.rag.coverage import needed_tools
+
+    needed = set(needed_tools(question))
+    if needed:
+        parsed = [name for name in parsed if name in needed]
+    if not parsed:
+        return None
+    return order_steps(parsed, question)
 
 
 def fallback_steps(question: str) -> list[str]:
@@ -154,7 +213,13 @@ def fallback_steps(question: str) -> list[str]:
 
 
 def run_mixed(database_url: str, question: str) -> dict:
-    steps = draft_steps(question) or fallback_steps(question)
+    drafted = draft_steps(question)
+    if drafted:
+        steps = drafted
+        planner = "llama"
+    else:
+        steps = fallback_steps(question)
+        planner = "keyword"
     retries = 0
     graph = None
     sql = None
@@ -217,6 +282,7 @@ def run_mixed(database_url: str, question: str) -> dict:
         "sql": sql,
         "graph": graph,
         "steps": steps,
+        "planner": planner,
         "retried": retried,
         "missing": missing,
         "grounding": flags,

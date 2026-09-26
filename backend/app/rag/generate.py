@@ -99,16 +99,21 @@ def _pages(text: str) -> set[int]:
 
 
 def _named_amounts(text: str) -> dict[str, set[str]]:
-    """Customer name plus a dollar total mentioned soon after it."""
+    """Customer name plus a dollar total before the next customer name."""
     from app.rag.sql_tool import CUSTOMER_NAMES
 
-    found: dict[str, set[str]] = {}
+    spans = []
     for name in CUSTOMER_NAMES:
         for match in re.finditer(re.escape(name), text, flags=re.I):
-            window = text[match.start() : match.start() + 160]
-            amounts = _money(window)
-            if amounts:
-                found.setdefault(name, set()).update(amounts)
+            spans.append((match.start(), match.end(), name))
+    spans.sort()
+    found: dict[str, set[str]] = {}
+    for index, (start, end, name) in enumerate(spans):
+        nxt = spans[index + 1][0] if index + 1 < len(spans) else end + 160
+        window = text[start : min(nxt, end + 160)]
+        amounts = _money(window)
+        if amounts:
+            found.setdefault(name, set()).update(amounts)
     return found
 
 
@@ -149,6 +154,11 @@ def review_answer(answer: str, valid_ids: set[str], evidence: str) -> tuple[str,
             flags.append(
                 f"Evidence check: the answer assigns {name} a total the evidence does not."
             )
+    for name, known in evidence_named.items():
+        if len(known) > 1 and name in answer_named and "disagree" not in answer.lower():
+            flags.append(
+                f"Evidence check: sources disagree on {name}, and the answer does not say so."
+            )
 
     evidence_amounts = _money(evidence)
     answer_amounts = _money(answer)
@@ -165,11 +175,34 @@ def review_answer(answer: str, valid_ids: set[str], evidence: str) -> tuple[str,
     return answer, flags
 
 
-def answer_with_sources(question: str, sources: list[tuple[str, str]]) -> tuple[str | None, list[str]]:
+def answer_with_sources(
+    question: str,
+    sources: list[tuple[str, str]],
+    write=None,
+) -> tuple[str | None, list[str]]:
+    """Write from the evidence. One rewrite if the checks flag the first draft.
+
+    A second draft can still be wrong. The checks are not a full fact review.
+    """
     if not sources:
         return None, ["No evidence was retrieved."]
+    writer = write or answer_from_evidence
     evidence = "\n".join(f"[{sid}] {text}" for sid, text in sources)
-    written = answer_from_evidence(question, evidence)
+    valid_ids = {sid for sid, _ in sources}
+    written = writer(question, evidence)
     if not written:
         return None, []
-    return review_answer(written, {sid for sid, _ in sources}, evidence)
+    checked, flags = review_answer(written, valid_ids, evidence)
+    if not flags:
+        return checked, flags
+    retry_question = (
+        question
+        + "\nThe previous answer failed these checks: "
+        + " ".join(flags)
+        + " Rewrite it from the evidence only. Cite the source ids. "
+        + "If the evidence is not enough, say what is missing."
+    )
+    second = writer(retry_question, evidence)
+    if not second:
+        return checked, flags
+    return review_answer(second, valid_ids, evidence)

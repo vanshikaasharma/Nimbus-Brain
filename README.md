@@ -20,7 +20,7 @@ Naive RAG (embed chunks → top-k → LLM) only handles (1). That is the point o
 
 If the route is `mixed`, Llama returns a JSON list of the tools to run (`graph`, `sql`, `docs`), with no duplicates and at most three. Graph can run before SQL so invoice lookup uses the account names from the paths. If the list is invalid or the model times out, the keyword tool list is used instead, in the order graph, then SQL, then docs.
 
-Invoice months are not hardcoded. “Last month”, “this month”, and a named month use the current date in `APP_TIMEZONE` (default `America/Los_Angeles`). “August 2026” still selects `period_start` 2026-08-01. One empty invoice or doc lookup can be widened once. The answer has to cite source ids. If evidence is missing, the reply says so.
+Invoice months are not hardcoded. “Last month”, “this month”, and a named month use the current date in `APP_TIMEZONE` (default `America/Vancouver`). “August 2026” still selects `period_start` 2026-08-01. One empty invoice or doc lookup can be widened once. The answer has to cite source ids. If evidence is missing, the reply says so.
 
 ## One extra lookup
 
@@ -65,7 +65,7 @@ Postgres (Neon) has three tables: `plans`, `customers`, `invoices`. Six accounts
 
 ## How to run
 
-Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`). Chat uses local Ollama: `OPENAI_API_KEY=ollama`, `OPENAI_BASE_URL=http://127.0.0.1:11434/v1`, `OPENAI_CHAT_MODEL=llama3.2`. Optional `APP_TIMEZONE` defaults to `America/Los_Angeles`. Without a chat model, templates and keyword rules still run, and `/ask` still returns passages.
+Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`). Chat uses local Ollama: `OPENAI_API_KEY=ollama`, `OPENAI_BASE_URL=http://127.0.0.1:11434/v1`, `OPENAI_CHAT_MODEL=llama3.2`. Optional `APP_TIMEZONE` defaults to `America/Vancouver`. Override it in the environment to use another zone. Without a chat model, templates and keyword rules still run, and `/ask` still returns passages.
 
 ```bash
 # one-time: install and seed
@@ -104,11 +104,11 @@ Try the routed box:
 
 **Ask** plans a route with Llama, then runs that tool (or the mixed list). The keyword function is the fallback, and it is still the stable score below.
 
-**Ask with the loop** is separate. `POST /agent` uses LangGraph. The model chooses a tool, reads what came back, and may call another tool. It stops after a few steps. Its score is not the keyword score.
+**Ask with the loop** is separate. `POST /agent` uses LangGraph. The model chooses a tool, reads what came back, and may call another tool. If it writes a final sentence while part of the question is still unanswered, the server calls that missing tool once and then writes the answer from the combined evidence. It does not call every tool. Its score is not the keyword score.
 
 ## Checks on the answer
 
-Answers are asked to cite `[S1]`, `[G1]`, or `[D1]`, and a PDF page when the passage has one. The checker flags unknown ids, missing citations, dollar amounts that are not in the evidence, customer names that are not in the evidence, and a total assigned to the wrong customer when both sides name one amount. A clean check does not mean every sentence was verified. The model can still omit a citation or phrase a true cent value in a way the checker flags.
+Answers are asked to cite `[S1]`, `[G1]`, or `[D1]`, and a PDF page when the passage has one. The checker flags unknown ids, missing citations, dollar amounts that are not in the evidence, customer names that are not in the evidence, a total assigned to the wrong customer, a partial list of totals, and two amounts for one customer when the answer does not say they disagree. If those flags fire, the answer is rewritten once from the same evidence. A clean check does not mean every sentence was verified. A dollar figure in a doc can still look like a second invoice total.
 
 ## Report card
 
@@ -128,24 +128,28 @@ python backend/eval/run_eval.py
 
 Those 10 questions match the keyword rules, so 10/10 routing is expected. Embedding search over the markdown does not see the invoice table.
 
-Llama comparison on those 10 plus 7 extended questions (`backend/eval/extended.json`): paraphrases without the keyword list, Hooli (not in the original 10), July 2026, a January 2019 invoice that does not exist, a reverse graph hop, and a mixed question that needs graph and SQL only.
+Llama comparison on those 10 plus 13 extended questions (`backend/eval/extended.json`): paraphrases the keyword list does not contain, Hooli, July 2026, a January 2019 invoice that does not exist, a reverse graph hop, graph+SQL, graph+docs, SQL+docs, and all three tools.
 
 ```bash
 python backend/eval/run_eval.py --llm
 ```
 
+Latest run on this machine, with local Llama 3.2 and the seeded Neon database:
+
 | Check | Result |
 | --- | --- |
-| Keyword labels on all 17 | 15/17 (the two paraphrases are `unknown`) |
-| Llama labels on all 17 | 14/17, with 5 falling back to keywords |
-| Llama misses | Enterprise customers labeled `graph`; side email labeled `docs`; “what did Acme pay in August 2026” labeled `unknown` |
-| Extended docs | 1/1 (`pricing.md` for the Pro paraphrase) |
-| Extended SQL | Hooli July $99 and Acme July $2,100 matched. January 2019 returned 0 rows. The “pay” paraphrase was written as `SUM(amount_cents)` and returned 347000, but the scorer looked for a column named `amount_cents`, so that run printed a miss. |
+| Keyword labels on all 23 | 19/23. The four misses are paraphrases with none of the keyword list (`unknown`). |
+| Llama labels on all 23 | 23/23. Keyword fallback was used 0 times. |
+| Extended docs | 1/1 (`pricing.md`) |
+| Extended SQL | 6/6, including “pay” and “spend”, Enterprise subscribers, Hooli July, Acme July, and 0 rows for January 2019 |
 | Reverse graph | Plan `Account Soylent ← IMPACTS ← Incident`. Names matched. |
-| Mixed tool list | Keyword list was `graph`, `sql`. Llama returned no usable list (`None`); the keyword list ran. The sentence did not cite a source id. |
-| Slowest extended retrieval | 14.6s on that mixed question |
-| Agent loop, 3 single-tool questions | 3/3 tool choice. Docs said 200 requests per second. SQL said $3470.00. Graph named Acme and Soylent. |
-| Agent mixed follow-up | Called `graph` only, then said it still needed the August invoices and did not call SQL. |
+| Mixed tool lists | Keyword list 4/4. Llama list 4/4: graph then SQL, graph+docs, SQL+docs, and all three. |
+| Citation check | Acme July answer cited `[S1]` for $2100.00 with no flags. Graph+SQL mixed answer had no flags. |
+| Evidence-check flags that remained | SQL+docs did not mention every dollar figure in the evidence. The three-tool answer was flagged because Acme was tied to more than one amount and not every total was repeated. |
+| Slowest extended retrieval | 17.2s on the three-tool question |
+| Agent loop, 4 questions | 4/4 called the expected tools. Docs cited `[D2]` and 200 requests per second. SQL cited `[S1]` and $3470.00. Graph cited `[G1]` and `[G2]` for Acme and Soylent. The mixed question called graph, then SQL, and cited both August invoices. |
+
+Unit tests before these routing changes: 27 passed. After: 46 passed. They do not need Neon or Ollama. The table above does.
 
 Unit tests cover dates, PDF chunking, retry choice, citation flags, and the extended keyword labels. They do not need Neon or Ollama:
 
