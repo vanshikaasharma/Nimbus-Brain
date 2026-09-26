@@ -47,9 +47,10 @@ export function Inspector({ route, reason, retried, chunks, sql, rows, paths, tr
           <h3>Docs</h3>
           <ul className="chunks">
             {chunks.map((chunk) => (
-              <li key={`${chunk.doc_path}-${chunk.section}`}>
+              <li key={chunk.source_id ?? `${chunk.doc_path}-${chunk.section}`}>
                 <code>
-                  {chunk.doc_path} &gt; {chunk.section}
+                  {chunk.source_id ?? chunk.doc_path}
+                  {chunk.page_number ? ` p.${chunk.page_number}` : ""} &gt; {chunk.section}
                 </code>
                 <pre>{chunk.body}</pre>
               </li>

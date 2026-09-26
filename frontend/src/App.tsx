@@ -342,9 +342,10 @@ export default function App() {
       {chunks.length > 0 && (
         <ul className="chunks">
           {chunks.map((chunk) => (
-            <li key={`${chunk.doc_path}-${chunk.section}`}>
+            <li key={chunk.source_id ?? `${chunk.doc_path}-${chunk.section}`}>
               <code>
-                {chunk.doc_path} &gt; {chunk.section}
+                {chunk.source_id ?? chunk.doc_path}
+                {chunk.page_number ? ` p.${chunk.page_number}` : ""} &gt; {chunk.section}
               </code>
               <span className="score">score {chunk.score.toFixed(3)}</span>
               <pre>{chunk.body}</pre>

@@ -29,18 +29,21 @@ load_dotenv(ROOT / ".env")
 SCHEMA = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
 
-DROP TABLE IF EXISTS doc_chunks;
-
-CREATE TABLE doc_chunks (
+CREATE TABLE IF NOT EXISTS doc_chunks (
     id SERIAL PRIMARY KEY,
     doc_path TEXT NOT NULL,
     section TEXT NOT NULL,
     body TEXT NOT NULL,
     embedding vector({DIM}) NOT NULL,
+    page_number INTEGER,
+    source_id TEXT,
     tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(body, ''))) STORED
 );
 
-CREATE INDEX doc_chunks_tsv_idx ON doc_chunks USING GIN (tsv);
+ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS page_number INTEGER;
+ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS source_id TEXT;
+
+CREATE INDEX IF NOT EXISTS doc_chunks_tsv_idx ON doc_chunks USING GIN (tsv);
 """
 
 
@@ -49,11 +52,12 @@ def main():
     if not url:
         raise SystemExit("DATABASE_URL is missing. Copy .env.example to .env.")
 
-    chunks = chunk_corpus()
+    chunks, skipped = chunk_corpus()
     if not chunks:
-        raise SystemExit("No markdown files found in corpus/.")
+        raise SystemExit("No markdown or text PDF files found in corpus/.")
 
     vectors = embed_texts([c["body"] for c in chunks])
+    paths = sorted({chunk["doc_path"] for chunk in chunks})
 
     with psycopg.connect(url) as conn:
         register_vector(conn)
@@ -62,19 +66,36 @@ def main():
             if statement:
                 conn.execute(statement)
 
+        conn.execute(
+            "DELETE FROM doc_chunks WHERE doc_path = ANY(%s)",
+            (paths,),
+        )
         for chunk, vector in zip(chunks, vectors):
             conn.execute(
                 """
-                INSERT INTO doc_chunks (doc_path, section, body, embedding)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO doc_chunks (doc_path, section, body, embedding, page_number, source_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (chunk["doc_path"], chunk["section"], chunk["body"], vector),
+                (
+                    chunk["doc_path"],
+                    chunk["section"],
+                    chunk["body"],
+                    vector,
+                    chunk["page_number"],
+                    chunk["source_id"],
+                ),
             )
         conn.commit()
 
     print(f"Indexed {len(chunks)} chunks from corpus/ into doc_chunks.")
+    if skipped:
+        print(
+            f"Skipped {skipped} PDF page(s) with no extractable text. "
+            "Scanned PDFs are not supported."
+        )
     for chunk in chunks:
-        print(f"  - {chunk['doc_path']} > {chunk['section']}")
+        page = f" p.{chunk['page_number']}" if chunk["page_number"] else ""
+        print(f"  - {chunk['source_id']}{page} > {chunk['section']}")
 
 
 if __name__ == "__main__":
