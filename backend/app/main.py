@@ -18,7 +18,7 @@ from app.rag.generate import answer_from_evidence, with_dollars
 from app.rag.graph_tool import walk
 from app.rag.mixed import run_mixed
 from app.rag.naive import ask
-from app.rag.router import classify
+from app.rag.router import choose_route
 from app.rag.sql_tool import run_question
 from app.tracing import trace_id, tracer
 
@@ -117,7 +117,7 @@ def chat(req: AskRequest):
 
     question = req.question.strip()
     with tracer.start_as_current_span("chat") as span:
-        decision = classify(question)
+        decision = choose_route(question)
         route = decision["route"]
         span.set_attribute("nimbus.route", route)
         span.set_attribute("nimbus.question", question[:300])

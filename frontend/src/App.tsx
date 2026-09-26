@@ -61,6 +61,7 @@ export default function App() {
   const [graphError, setGraphError] = useState<string | null>(null);
   const [graphPaths, setGraphPaths] = useState<string[]>([]);
   const [graphTriples, setGraphTriples] = useState<string[]>([]);
+  const [graphNote, setGraphNote] = useState<string | null>(null);
   const [routedQuestion, setRoutedQuestion] = useState(ROUTED_EXAMPLES[0].question);
   const [routePending, setRoutePending] = useState(false);
   const [routeMode, setRouteMode] = useState<"chat" | "agent">("chat");
@@ -205,6 +206,7 @@ export default function App() {
     if (!text || graphPending) return;
     setGraphPending(true);
     setGraphError(null);
+    setGraphNote(null);
     try {
       const res = await fetch("/api/graph", {
         method: "POST",
@@ -216,10 +218,12 @@ export default function App() {
         setGraphError(data.error);
         setGraphPaths([]);
         setGraphTriples([]);
+        setGraphNote(data.explanation ?? null);
         return;
       }
       setGraphPaths(data.paths ?? []);
       setGraphTriples(data.triples ?? []);
+      setGraphNote(data.explanation ?? null);
     } catch {
       setGraphError("Graph ask failed. Is the API running?");
     } finally {
@@ -402,7 +406,7 @@ export default function App() {
 
       <h2>Ask the graph</h2>
       <p className="hint">
-        Walks incident → account → plan. It does not search docs or invoices.
+        The model names a one-hop or two-hop plan. The server checks it, then reads nodes and edges.
       </p>
       <form className="ask" onSubmit={onGraph}>
         <textarea
@@ -428,6 +432,7 @@ export default function App() {
         </div>
       </form>
       {graphError && <p className="error">{graphError}</p>}
+      {graphNote && <p className="hint">{graphNote}</p>}
       {graphPaths.length > 0 && (
         <ul className="paths">
           {graphPaths.map((path) => (
