@@ -74,6 +74,9 @@ export default function App() {
   const [routeSqlRows, setRouteSqlRows] = useState<Record<string, unknown>[]>([]);
   const [routePaths, setRoutePaths] = useState<string[]>([]);
   const [routeRetried, setRouteRetried] = useState(false);
+  const [routeTools, setRouteTools] = useState<string[]>([]);
+  const [routeRetries, setRouteRetries] = useState<{ tool: string; reason: string }[]>([]);
+  const [routeMissing, setRouteMissing] = useState<string[]>([]);
   const [routeTraceId, setRouteTraceId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -166,6 +169,9 @@ export default function App() {
     setRouteSqlRows([]);
     setRoutePaths([]);
     setRouteRetried(false);
+    setRouteTools([]);
+    setRouteRetries([]);
+    setRouteMissing([]);
     setRouteTraceId(null);
     try {
       const res = await fetch(mode === "agent" ? "/api/agent" : "/api/chat", {
@@ -192,6 +198,9 @@ export default function App() {
       }
       setRoutePaths(data.graph?.paths ?? []);
       setRouteRetried(Boolean(data.retried));
+      setRouteTools(data.tools ?? []);
+      setRouteRetries(data.retries ?? []);
+      setRouteMissing(data.missing ?? []);
       setRouteTraceId(data.phoenix_trace_id ?? null);
     } catch {
       setRouteError("Chat failed. Is the API running?");
@@ -300,6 +309,9 @@ export default function App() {
           route={routeName}
           reason={routeReason}
           retried={routeRetried}
+          tools={routeTools}
+          retries={routeRetries}
+          missing={routeMissing}
           chunks={routeChunks}
           sql={routeSql}
           rows={routeSqlRows}

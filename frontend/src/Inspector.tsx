@@ -1,9 +1,17 @@
 import type { Chunk } from "./types";
 
+type Retry = {
+  tool: string;
+  reason: string;
+};
+
 type Props = {
   route: string | null;
   reason: string | null;
   retried: boolean;
+  tools: string[];
+  retries: Retry[];
+  missing: string[];
   chunks: Chunk[];
   sql: string | null;
   rows: Record<string, unknown>[];
@@ -23,7 +31,19 @@ function formatCell(column: string, value: unknown) {
   return String(value);
 }
 
-export function Inspector({ route, reason, retried, chunks, sql, rows, paths, traceId }: Props) {
+export function Inspector({
+  route,
+  reason,
+  retried,
+  tools,
+  retries,
+  missing,
+  chunks,
+  sql,
+  rows,
+  paths,
+  traceId,
+}: Props) {
   return (
     <aside className="inspector">
       <h2>Evidence</h2>
@@ -38,7 +58,16 @@ export function Inspector({ route, reason, retried, chunks, sql, rows, paths, tr
       ) : (
         <p className="hint">Ask a question to see which tool was chosen.</p>
       )}
-      {retried && (
+      {tools.length > 0 && (
+        <p className="hint">Tools: {tools.join(", ")}</p>
+      )}
+      {retries.map((retry) => (
+        <p className="hint" key={`${retry.tool}-${retry.reason}`}>
+          Retry ({retry.tool}): {retry.reason}
+        </p>
+      ))}
+      {missing.length > 0 && <p className="hint">Missing: {missing.join(", ")}</p>}
+      {retried && retries.length === 0 && (
         <p className="hint">Retried once after the first passages did not support the question.</p>
       )}
 

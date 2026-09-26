@@ -1,6 +1,7 @@
 """Nimbus Brain API.
 
-/chat uses keyword routing. /agent lets the model pick tools in a loop.
+/chat routes with the local model and falls back to keywords.
+/agent lets the model pick tools in a loop.
 """
 
 import os
@@ -14,9 +15,8 @@ import psycopg
 from psycopg.rows import dict_row
 
 from app.rag.agent import run_agent
-from app.rag.generate import answer_with_sources, with_dollars
+from app.rag.fallback import with_fallback
 from app.rag.graph_tool import walk
-from app.rag.mixed import run_mixed
 from app.rag.naive import ask
 from app.rag.router import choose_route
 from app.rag.sql_tool import run_question
@@ -111,7 +111,7 @@ def ask_graph(req: AskRequest):
 
 @app.post("/chat")
 def chat(req: AskRequest):
-    """Classify, then call one tool. Mixed questions run the fixed three-tool pipeline."""
+    """Route the question, run that tool, and retry once only when it is justified."""
     if not DATABASE_URL:
         return {"error": "DATABASE_URL is not set"}
 
@@ -128,32 +128,7 @@ def chat(req: AskRequest):
         }
 
         try:
-            if route == "docs":
-                result.update(ask(DATABASE_URL, question))
-            elif route == "sql":
-                sql = run_question(DATABASE_URL, question)
-                result["sql"] = sql
-                rows = with_dollars(sql.get("rows"))
-                if not rows:
-                    result["answer"] = "The tables returned no rows for that question."
-                else:
-                    sources = [(f"S{index}", str(row)) for index, row in enumerate(rows, start=1)]
-                    written, flags = answer_with_sources(question, sources)
-                    result["answer"] = written or "The rows are the answer. Set OPENAI_API_KEY to turn them into a sentence."
-                    result["grounding"] = flags
-            elif route == "graph":
-                graph = walk(DATABASE_URL, question)
-                result["graph"] = graph
-                paths = graph.get("paths") or []
-                if not paths:
-                    result["answer"] = "The graph returned no path for that question."
-                else:
-                    sources = [(f"G{index}", path) for index, path in enumerate(paths, start=1)]
-                    written, flags = answer_with_sources(question, sources)
-                    result["answer"] = written or "The paths are the answer. Set OPENAI_API_KEY to turn them into a sentence."
-                    result["grounding"] = flags
-            elif route == "mixed":
-                result.update(run_mixed(DATABASE_URL, question))
+            result.update(with_fallback(DATABASE_URL, question, route))
         except psycopg.Error as exc:
             return {
                 "error": f"Routed to {route}, then the database failed: {exc}",
