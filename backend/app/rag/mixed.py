@@ -14,6 +14,7 @@ from datetime import date, datetime
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.dates import period_for_question
 from app.rag.generate import answer_with_sources, with_dollars
 from app.rag.grade import rewrite_once
 from app.rag.graph_tool import walk
@@ -46,7 +47,7 @@ def accounts_from_paths(paths: list[str]) -> list[str]:
     return names
 
 
-def invoices_for(database_url: str, names: list[str], august_only: bool = True) -> dict:
+def invoices_for(database_url: str, names: list[str], period: date | None = None) -> dict:
     if not names:
         return {
             "sql": None,
@@ -60,12 +61,14 @@ FROM invoices i
 JOIN customers c ON c.id = i.customer_id
 WHERE c.name = ANY(%s)
 """.strip()
-    if august_only:
-        sql += "\n  AND i.period_start = DATE '2026-08-01'"
+    params: list = [names]
+    if period is not None:
+        sql += "\n  AND i.period_start = %s"
+        params.append(period)
     sql += "\nORDER BY c.name, i.period_start"
 
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        raw_rows = conn.execute(sql, (names,)).fetchall()
+        raw_rows = conn.execute(sql, params).fetchall()
 
     rows = []
     for row in raw_rows:
@@ -77,8 +80,14 @@ WHERE c.name = ANY(%s)
                 clean[key] = value
         rows.append(clean)
 
-    shown = sql.replace("%s", "(" + ", ".join(repr(name) for name in names) + ")")
-    scope = "August invoices" if august_only else "Invoices from every seeded month"
+    shown = sql.replace("%s", "(" + ", ".join(repr(name) for name in names) + ")", 1)
+    if period is not None:
+        shown = shown.replace("%s", f"DATE '{period.isoformat()}'", 1)
+    scope = (
+        f"Invoices for {period.isoformat()}"
+        if period is not None
+        else "Invoices from every seeded month"
+    )
     return {
         "sql": shown,
         "rows": rows,
@@ -159,11 +168,12 @@ def run_mixed(database_url: str, question: str) -> dict:
             names = accounts_from_paths(graph.get("paths") or [])
         elif tool == "sql":
             if names:
-                sql = invoices_for(database_url, names, august_only=True)
-                if not sql.get("rows") and retries < 1:
+                period = period_for_question(question)
+                sql = invoices_for(database_url, names, period=period)
+                if period is not None and not sql.get("rows") and retries < 1:
                     retries += 1
                     retried = True
-                    sql = invoices_for(database_url, names, august_only=False)
+                    sql = invoices_for(database_url, names, period=None)
             else:
                 sql = run_question(database_url, question)
         elif tool == "docs":

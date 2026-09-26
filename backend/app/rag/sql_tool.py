@@ -14,6 +14,8 @@ from decimal import Decimal
 import psycopg
 from psycopg.rows import dict_row
 
+from app.rag.dates import app_today, period_for_question
+
 ALLOWED_TABLES = {"plans", "customers", "invoices"}
 FORBIDDEN = re.compile(
     r"\b(insert|update|delete|drop|alter|truncate|create|grant|copy|execute|call)\b",
@@ -25,7 +27,7 @@ SCHEMA = """
 plans(id, name, monthly_fee_cents, rate_limit_rps)
 customers(id, name, plan_id)  -- names: Acme, Soylent, Globex, Initech, Umbrella, Hooli
 invoices(id, customer_id, period_start, period_end, amount_cents)
-Money is stored as cents. Last month relative to Sep 2026 is August 2026 (period_start = 2026-08-01).
+Money is stored as cents. period_start is the first day of the billed month.
 """
 
 CUSTOMER_NAMES = ["Acme", "Soylent", "Globex", "Initech", "Umbrella", "Hooli"]
@@ -57,22 +59,28 @@ def ensure_select_only(sql: str) -> str:
     return sql
 
 
-def draft_sql_without_llm(question: str) -> tuple[str, str] | None:
+def draft_sql_without_llm(
+    question: str,
+    today: date | None = None,
+) -> tuple[str, str, list] | None:
     """Tiny matcher so the demo works without an API key."""
     q = question.lower()
     customer = next((name for name in CUSTOMER_NAMES if name.lower() in q), None)
 
     if customer and any(word in q for word in ("invoice", "bill", "charged", "usage")):
-        sql = f"""
+        sql = """
 SELECT c.name, i.period_start, i.period_end, i.amount_cents
 FROM invoices i
 JOIN customers c ON c.id = i.customer_id
-WHERE c.name = '{customer}'
+WHERE c.name = %s
 """.strip()
-        if "last month" in q or "august" in q:
-            sql += "\nAND i.period_start = DATE '2026-08-01'"
+        params: list = [customer]
+        period = period_for_question(question, today)
+        if period is not None:
+            sql += "\nAND i.period_start = %s"
+            params.append(period)
         sql += "\nORDER BY i.period_start DESC"
-        return sql, f"Matched the invoice template for {customer}."
+        return sql, f"Matched the invoice template for {customer}.", params
 
     if "enterprise" in q and any(word in q for word in ("who", "which", "customer", "account")):
         sql = """
@@ -82,14 +90,21 @@ JOIN plans p ON p.id = c.plan_id
 WHERE p.name = 'Enterprise'
 ORDER BY c.name
 """.strip()
-        return sql, "Matched the Enterprise membership template."
+        return sql, "Matched the Enterprise membership template.", []
 
     return None
 
 
-def draft_sql_with_llm(question: str) -> tuple[str, str]:
+def draft_sql_with_llm(question: str, today: date | None = None) -> tuple[str, str]:
     from openai import OpenAI
 
+    current = app_today(today)
+    period = period_for_question(question, current)
+    period_note = (
+        f"The question names period_start {period.isoformat()}."
+        if period is not None
+        else "The question does not name a month. Do not add a date filter."
+    )
     api_key = os.environ["OPENAI_API_KEY"]
     client = OpenAI(
         api_key=api_key,
@@ -105,10 +120,12 @@ def draft_sql_with_llm(question: str) -> tuple[str, str]:
                     "Write one PostgreSQL SELECT for the Nimbus tables. "
                     "No markdown. No comments. SELECT only.\n"
                     f"Schema:\n{SCHEMA}\n"
-                    "Example: What was Acme's invoice last month?\n"
+                    f"Today is {current.isoformat()} in timezone {os.environ.get('APP_TIMEZONE', 'America/Los_Angeles')}. "
+                    f"{period_note}\n"
+                    "Example shape:\n"
                     "SELECT c.name, i.period_start, i.period_end, i.amount_cents "
                     "FROM invoices i JOIN customers c ON c.id = i.customer_id "
-                    "WHERE c.name = 'Acme' AND i.period_start = DATE '2026-08-01'"
+                    "WHERE c.name = 'Acme' AND i.period_start = DATE 'YYYY-MM-01'"
                 ),
             },
             {"role": "user", "content": question},
@@ -128,6 +145,7 @@ def jsonish(value):
 
 def run_question(database_url: str, question: str) -> dict:
     drafted = draft_sql_without_llm(question)
+    params: list = []
     if drafted is None:
         if not os.environ.get("OPENAI_API_KEY"):
             return {
@@ -136,16 +154,16 @@ def run_question(database_url: str, question: str) -> dict:
                     "Try: What was Acme's invoice last month?"
                 )
             }
-        drafted = draft_sql_with_llm(question)
-
-    raw_sql, explanation = drafted
+        raw_sql, explanation = draft_sql_with_llm(question)
+    else:
+        raw_sql, explanation, params = drafted
     try:
         sql = ensure_select_only(raw_sql)
     except ValueError as exc:
         return {"error": str(exc), "sql": raw_sql}
 
     with psycopg.connect(database_url, row_factory=dict_row) as conn:
-        rows = conn.execute(sql).fetchall()
+        rows = conn.execute(sql, params).fetchall()
 
     return {
         "sql": sql,
