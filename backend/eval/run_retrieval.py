@@ -70,45 +70,55 @@ def rank_of(hits: list[dict], expected: str) -> int | None:
     return None
 
 
+def fused_hits(url: str, question: str) -> list[dict]:
+    """Search, then close the connection before any slow local rerank."""
+    import psycopg
+    from pgvector.psycopg import register_vector
+    from psycopg.rows import dict_row
+
+    from app.rag.retrieve import hybrid_search
+
+    last_error = None
+    for _attempt in range(2):
+        try:
+            with psycopg.connect(url, row_factory=dict_row) as conn:
+                register_vector(conn)
+                return hybrid_search(conn, question)
+        except psycopg.OperationalError as exc:
+            last_error = exc
+    raise last_error
+
+
 def score_pair(embedding: str, reranker: str) -> dict:
     os.environ["EMBEDDING_MODEL"] = embedding
     os.environ["RERANKER"] = reranker
     from app.ingest.ingest_docs import main as ingest_main
     from app.rag.rerank import rerank
-    from app.rag.retrieve import hybrid_search
 
     started = time.perf_counter()
     ingest_main()
     ingest_seconds = time.perf_counter() - started
 
-    import psycopg
-    from pgvector.psycopg import register_vector
-    from psycopg.rows import dict_row
-
     url = os.environ["DATABASE_URL"]
-    with psycopg.connect(url, row_factory=dict_row) as conn:
-        register_vector(conn)
-        warmup = hybrid_search(conn, "warmup")
-        rerank("warmup", warmup[:1])
+    warmup = fused_hits(url, "warmup")
+    rerank("warmup", warmup[:1])
     recalls = []
     mrr_fused = []
     mrr_reranked = []
     latencies = []
     rows = []
-    with psycopg.connect(url, row_factory=dict_row) as conn:
-        register_vector(conn)
-        for item in QUESTIONS:
-            t0 = time.perf_counter()
-            fused = hybrid_search(conn, item["question"])
-            reranked = rerank(item["question"], fused)
-            elapsed = time.perf_counter() - t0
-            latencies.append(elapsed)
-            fused_rank = rank_of(fused, item["expect_source"])
-            final_rank = rank_of(reranked, item["expect_source"])
-            recalls.append(int(final_rank is not None and final_rank <= 3))
-            mrr_fused.append(0.0 if fused_rank is None else 1.0 / fused_rank)
-            mrr_reranked.append(0.0 if final_rank is None else 1.0 / final_rank)
-            rows.append(
+    for item in QUESTIONS:
+        t0 = time.perf_counter()
+        fused = fused_hits(url, item["question"])
+        reranked = rerank(item["question"], fused)
+        elapsed = time.perf_counter() - t0
+        latencies.append(elapsed)
+        fused_rank = rank_of(fused, item["expect_source"])
+        final_rank = rank_of(reranked, item["expect_source"])
+        recalls.append(int(final_rank is not None and final_rank <= 3))
+        mrr_fused.append(0.0 if fused_rank is None else 1.0 / fused_rank)
+        mrr_reranked.append(0.0 if final_rank is None else 1.0 / final_rank)
+        rows.append(
                 {
                     "id": item["id"],
                     "kind": item["kind"],
@@ -141,7 +151,10 @@ def main():
     if args.only:
         embedding, reranker = args.only.split("+", 1)
         selected = ((embedding, reranker),)
+    out = Path(__file__).with_name("retrieval_results.json")
     results = []
+    if args.only and out.exists():
+        results = json.loads(out.read_text())
     for embedding, reranker in selected:
         label = f"{embedding}+{reranker}"
         print(f"\n=== {label} ===", flush=True)
@@ -149,9 +162,15 @@ def main():
             scored = score_pair(embedding, reranker)
         except Exception as exc:
             print(f"{label} failed: {type(exc).__name__}: {exc}")
-            results.append({"embedding": embedding, "reranker": reranker, "error": f"{type(exc).__name__}: {exc}"})
-            continue
+            scored = {"embedding": embedding, "reranker": reranker, "error": f"{type(exc).__name__}: {exc}"}
+        results = [
+            item
+            for item in results
+            if not (item.get("embedding") == embedding and item.get("reranker") == reranker)
+        ]
         results.append(scored)
+        if "error" in scored:
+            continue
         print(
             f"Recall@3 {scored['recall_at_3']:.2f}  "
             f"MRR before {scored['mrr_before_rerank']:.2f}  "
@@ -164,9 +183,11 @@ def main():
                 f"  {row['id']:<24} fused={row['fused_rank']} rerank={row['rerank_rank']} "
                 f"{row['seconds']:.2f}s {row['kind']}"
             )
-    out = Path(__file__).with_name("retrieval_results.json")
-    out.write_text(json.dumps(results, indent=2))
-    print(f"\nWrote {out}")
+        out.write_text(json.dumps(results, indent=2))
+        print(f"Wrote {out}", flush=True)
+    if not args.only:
+        out.write_text(json.dumps(results, indent=2))
+        print(f"\nWrote {out}")
 
 
 if __name__ == "__main__":

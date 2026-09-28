@@ -53,11 +53,6 @@
     ]
   },
   {
-    "embedding": "bge",
-    "reranker": "qwen3",
-    "error": "OperationalError: consuming input failed: server closed the connection unexpectedly\n\tThis probably means the server terminated abnormally\n\tbefore or while processing the request.\nserver closed the connection unexpectedly\n\tThis probably means the server terminated abnormally\n\tbefore or while processing the request."
-  },
-  {
     "embedding": "qwen3",
     "reranker": "minilm",
     "ingest_seconds": 196.1,
@@ -160,6 +155,59 @@
         "fused_rank": 1,
         "rerank_rank": 1,
         "seconds": 64.823
+      }
+    ]
+  },
+  {
+    "embedding": "bge",
+    "reranker": "qwen3",
+    "ingest_seconds": 3.6,
+    "recall_at_3": 1.0,
+    "mrr_before_rerank": 0.9166666666666666,
+    "mrr_after_rerank": 0.8333333333333334,
+    "mean_latency_seconds": 31.820896694499996,
+    "questions": [
+      {
+        "id": "paraphrase-pro-limit",
+        "kind": "paraphrase",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 30.316
+      },
+      {
+        "id": "exact-outage-duration",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 33.351
+      },
+      {
+        "id": "similar-starter-not-pro",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 2,
+        "seconds": 34.277
+      },
+      {
+        "id": "quiet-hours-credit",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 30.825
+      },
+      {
+        "id": "exact-ledger-token",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 31.407
+      },
+      {
+        "id": "pdf-burst-ceiling",
+        "kind": "pdf passage",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 30.749
       }
     ]
   }

@@ -156,6 +156,7 @@ def run_llm(url: str) -> None:
     unavailable = 0
     failures = []
     latencies = []
+    routing_rows = []
 
     for item in questions:
         started = time.perf_counter()
@@ -166,10 +167,12 @@ def run_llm(url: str) -> None:
         keyword_ok += int(keyword == item["route"])
         if picked.get("rate_limited"):
             rate_limited += 1
+            routing_rows.append({"id": item["id"], "status": "rate_limit", "seconds": round(elapsed, 3)})
             print(f"{item['id']:<22} RATE LIMIT {elapsed:.1f}s (not scored as the chat model)")
             continue
         if picked.get("unavailable"):
             unavailable += 1
+            routing_rows.append({"id": item["id"], "status": "unavailable", "seconds": round(elapsed, 3)})
             print(f"{item['id']:<22} UNAVAILABLE {elapsed:.1f}s (not scored as the chat model)")
             continue
         model = picked["route"]
@@ -182,6 +185,17 @@ def run_llm(url: str) -> None:
             f"{item['id']:<22} keyword={keyword:<8} model={model:<8} "
             f"{mark} {elapsed:.1f}s"
         )
+        routing_rows.append(
+            {
+                "id": item["id"],
+                "status": "scored",
+                "keyword": keyword,
+                "model": model,
+                "fallback": bool(picked.get("fallback")),
+                "ok": model == item["route"],
+                "seconds": round(elapsed, 3),
+            }
+        )
         if model != item["route"]:
             failures.append(f"{item['id']}: model {model}, expected {item['route']}")
 
@@ -193,6 +207,7 @@ def run_llm(url: str) -> None:
     direction_ok = direction_total = 0
     doc_ok = doc_total = 0
     mixed_fixed_ok = mixed_dynamic_ok = mixed_total = 0
+    grounding_rows = []
 
     for item in extended:
         started = time.perf_counter()
@@ -214,6 +229,7 @@ def run_llm(url: str) -> None:
                     for index, row in enumerate(with_dollars(rows), start=1)
                 ]
                 written, flags = answer_with_sources(item["question"], sources)
+                grounding_rows.append({"id": item["id"], "flags": flags, "answer": written})
                 print(f"    model answer: {written}")
                 print(f"    citation/evidence flags: {flags or 'none'}")
             if not match:
@@ -262,6 +278,15 @@ def run_llm(url: str) -> None:
             mixed_fixed_ok += int(fixed_match)
             mixed_dynamic_ok += int(dynamic_match)
             result = run_mixed(url, item["question"])
+            grounding_rows.append(
+                {
+                    "id": item["id"],
+                    "flags": result.get("grounding") or [],
+                    "planner": result.get("planner"),
+                    "steps": result.get("steps"),
+                    "missing": result.get("missing"),
+                }
+            )
             print(
                 f"  {item['id']}: fixed={fixed} dynamic={dynamic} "
                 f"planner={result.get('planner')} ran={result.get('steps')} "
@@ -294,6 +319,37 @@ def run_llm(url: str) -> None:
             print(f"  - {item}")
     else:
         print("failures: none")
+    return {
+        "model": chat_model(),
+        "routing": {
+            "keyword_ok": keyword_ok,
+            "keyword_total": len(questions),
+            "model_ok": model_ok,
+            "model_scored": model_scored,
+            "fallbacks": fallback_used,
+            "rate_limits": rate_limited,
+            "unavailable": unavailable,
+            "rate_limit_events": len(RATE_LIMITS),
+            "latency_min": round(min(latencies), 3) if latencies else None,
+            "latency_max": round(max(latencies), 3) if latencies else None,
+            "failures": failures,
+            "rows": routing_rows,
+        },
+        "extended": {
+            "sql_ok": sql_ok,
+            "sql_total": sql_total,
+            "graph_ok": graph_ok,
+            "graph_total": graph_total,
+            "reverse_ok": direction_ok,
+            "reverse_total": direction_total,
+            "docs_ok": doc_ok,
+            "docs_total": doc_total,
+            "mixed_fixed_ok": mixed_fixed_ok,
+            "mixed_dynamic_ok": mixed_dynamic_ok,
+            "mixed_total": mixed_total,
+            "grounding": grounding_rows,
+        },
+    }
 
 
 AGENT_QUESTIONS = [
@@ -356,10 +412,13 @@ def run_unseen(url: str) -> None:
     print(f"Unseen routing sample: {len(UNSEEN)} questions")
     scored = 0
     ok = 0
+    skipped = []
+    rows = []
     for item in UNSEEN:
         before = len(RATE_LIMITS)
         picked = choose_route(item["question"])
         if picked.get("rate_limited") or picked.get("unavailable") or len(RATE_LIMITS) > before:
+            skipped.append({"id": item["id"], "reason": picked.get("reason")})
             print(f"  {item['id']}: not scored ({picked.get('reason')})")
             continue
         scored += 1
@@ -381,11 +440,13 @@ def run_unseen(url: str) -> None:
             match = set(steps or []) == set(item["expect_tools"])
             detail = f" steps={steps}"
         ok += int(match)
+        rows.append({"id": item["id"], "route": picked["route"], "ok": match, "detail": detail.strip()})
         print(f"  {item['id']}: route={picked['route']} ok={match}{detail}")
     print(f"unseen chat-model items: {ok}/{scored}")
+    return {"ok": ok, "scored": scored, "skipped": skipped, "rows": rows}
 
 
-def run_agent_eval(url: str) -> None:
+def run_agent_eval(url: str) -> dict:
     """Score the LangGraph loop on its own. Not the keyword report card."""
     from app.rag.agent import run_agent
 
@@ -393,6 +454,7 @@ def run_agent_eval(url: str) -> None:
     ok = 0
     failures = []
     skipped = 0
+    rows = []
     for item in AGENT_QUESTIONS:
         started = time.perf_counter()
         try:
@@ -402,12 +464,30 @@ def run_agent_eval(url: str) -> None:
             elapsed = time.perf_counter() - started
             print(f"{item['id']:<22} ERROR {type(exc).__name__}: {exc} {elapsed:.1f}s")
             failures.append(f"{item['id']}: {type(exc).__name__}: {exc}")
+            rows.append(
+                {
+                    "id": item["id"],
+                    "ok": False,
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "seconds": round(elapsed, 3),
+                }
+            )
             continue
         elapsed = time.perf_counter() - started
         steps = result.get("steps") or []
         expected = item.get("expect_tools") or [item["expect_tool"]]
         match = all(tool in steps for tool in expected)
         ok += int(match)
+        rows.append(
+            {
+                "id": item["id"],
+                "steps": steps,
+                "ok": match,
+                "seconds": round(elapsed, 3),
+                "grounding": result.get("grounding") or [],
+                "answer": result.get("answer"),
+            }
+        )
         print(
             f"{item['id']:<22} steps={steps} tool_ok={match} "
             f"{elapsed:.1f}s answer={result.get('answer')}"
@@ -421,6 +501,13 @@ def run_agent_eval(url: str) -> None:
             print(f"  - {item}")
     else:
         print("agent failures: none")
+    return {
+        "ok": ok,
+        "scored": len(AGENT_QUESTIONS) - skipped,
+        "errors": skipped,
+        "failures": failures,
+        "rows": rows,
+    }
 
 
 if __name__ == "__main__":
@@ -441,8 +528,17 @@ if __name__ == "__main__":
         if not database:
             raise SystemExit("DATABASE_URL is missing.")
         print()
-        run_llm(database)
-        print()
-        run_unseen(database)
-        print()
-        run_agent_eval(database)
+        from app.rag.chat import RATE_LIMITS, chat_model
+
+        RATE_LIMITS.clear()
+        report = {
+            "model": chat_model(),
+            "routing_and_extended": run_llm(database),
+            "unseen": run_unseen(database),
+            "agent": run_agent_eval(database),
+            "rate_limit_events": len(RATE_LIMITS),
+        }
+        slug = chat_model().replace("/", "_")
+        report_path = Path(__file__).with_name(f"chat_{slug}.json")
+        report_path.write_text(json.dumps(report, indent=2))
+        print(f"\nWrote {report_path}")

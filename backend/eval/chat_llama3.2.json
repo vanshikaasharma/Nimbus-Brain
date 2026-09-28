@@ -1,0 +1,370 @@
+{
+  "model": "llama3.2",
+  "routing_and_extended": {
+    "model": "llama3.2",
+    "routing": {
+      "keyword_ok": 19,
+      "keyword_total": 23,
+      "model_ok": 23,
+      "model_scored": 23,
+      "fallbacks": 0,
+      "rate_limits": 0,
+      "unavailable": 0,
+      "rate_limit_events": 0,
+      "latency_min": 0.0,
+      "latency_max": 74.853,
+      "failures": [],
+      "rows": [
+        {
+          "id": "pro-rate-limit",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 59.605
+        },
+        {
+          "id": "sla-credit",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 6.391
+        },
+        {
+          "id": "changelog-pro",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.729
+        },
+        {
+          "id": "acme-invoice",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 2.125
+        },
+        {
+          "id": "soylent-invoice",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.992
+        },
+        {
+          "id": "enterprise-customers",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.989
+        },
+        {
+          "id": "inc-104-enterprise",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.374
+        },
+        {
+          "id": "outage-who",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.238
+        },
+        {
+          "id": "mixed-outage",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 2.408
+        },
+        {
+          "id": "side-email",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "unknown",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.171
+        },
+        {
+          "id": "paraphrase-pro",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.307
+        },
+        {
+          "id": "paraphrase-acme-pay",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.547
+        },
+        {
+          "id": "hooli-july",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 4.115
+        },
+        {
+          "id": "acme-july-2026",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.158
+        },
+        {
+          "id": "acme-missing-2019",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.203
+        },
+        {
+          "id": "reverse-soylent",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.135
+        },
+        {
+          "id": "mixed-two-tools",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.077
+        },
+        {
+          "id": "paraphrase-spend",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.237
+        },
+        {
+          "id": "paraphrase-subscribers",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.152
+        },
+        {
+          "id": "private-text",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "unknown",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.14
+        },
+        {
+          "id": "mixed-graph-docs",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.012
+        },
+        {
+          "id": "mixed-sql-docs",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.441
+        },
+        {
+          "id": "mixed-three-tools",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.402
+        }
+      ]
+    },
+    "extended": {
+      "sql_ok": 6,
+      "sql_total": 6,
+      "graph_ok": 1,
+      "graph_total": 1,
+      "reverse_ok": 1,
+      "reverse_total": 1,
+      "docs_ok": 1,
+      "docs_total": 1,
+      "mixed_fixed_ok": 4,
+      "mixed_dynamic_ok": 4,
+      "mixed_total": 4,
+      "grounding": [
+        {
+          "id": "acme-july-2026",
+          "flags": [],
+          "answer": "According to the evidence, Acme's invoice in July 2026 was $2100.00. [S1]"
+        },
+        {
+          "id": "mixed-two-tools",
+          "flags": [],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "sql"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-graph-docs",
+          "flags": [],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "docs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-sql-docs",
+          "flags": [],
+          "planner": "llama",
+          "steps": [
+            "sql",
+            "docs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-three-tools",
+          "flags": [],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "sql",
+            "docs"
+          ],
+          "missing": []
+        }
+      ]
+    }
+  },
+  "unseen": {
+    "ok": 3,
+    "scored": 4,
+    "skipped": [],
+    "rows": [
+      {
+        "id": "unseen-overage",
+        "route": "docs",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "id": "unseen-initech",
+        "route": "sql",
+        "ok": true,
+        "detail": "sql=True"
+      },
+      {
+        "id": "unseen-incident-acme",
+        "route": "graph",
+        "ok": true,
+        "detail": "names=True plan=True"
+      },
+      {
+        "id": "unseen-limit-and-hooli",
+        "route": "mixed",
+        "ok": false,
+        "detail": "steps=['docs']"
+      }
+    ]
+  },
+  "agent": {
+    "ok": 4,
+    "scored": 4,
+    "errors": 0,
+    "failures": [],
+    "rows": [
+      {
+        "id": "agent-docs",
+        "steps": [
+          "docs"
+        ],
+        "ok": true,
+        "seconds": 18.832,
+        "grounding": [],
+        "answer": "The Pro rate limit is 200 requests / second. [D2]"
+      },
+      {
+        "id": "agent-sql",
+        "steps": [
+          "sql"
+        ],
+        "ok": true,
+        "seconds": 10.343,
+        "grounding": [],
+        "answer": "According to the evidence [S1], Acme's invoice in August 2026 was $3470.00."
+      },
+      {
+        "id": "agent-graph",
+        "steps": [
+          "graph"
+        ],
+        "ok": true,
+        "seconds": 24.452,
+        "grounding": [],
+        "answer": "According to the evidence, INC-104 affected the Enterprise accounts of Acme and Soylent. [G1] and [G2]"
+      },
+      {
+        "id": "agent-mixed",
+        "steps": [
+          "graph",
+          "sql"
+        ],
+        "ok": true,
+        "seconds": 30.681,
+        "grounding": [],
+        "answer": "INC-104 affected the accounts of Acme and Soylent. According to the evidence, Acme's August 2026 invoice was $3470.00 [S1], and Soylent's August 2026 invoice was $2180.00 [S2]."
+      }
+    ]
+  },
+  "rate_limit_events": 0
+}

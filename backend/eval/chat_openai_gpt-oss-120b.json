@@ -1,0 +1,387 @@
+{
+  "model": "openai/gpt-oss-120b",
+  "routing_and_extended": {
+    "model": "openai/gpt-oss-120b",
+    "routing": {
+      "keyword_ok": 19,
+      "keyword_total": 23,
+      "model_ok": 23,
+      "model_scored": 23,
+      "fallbacks": 0,
+      "rate_limits": 0,
+      "unavailable": 0,
+      "rate_limit_events": 0,
+      "latency_min": 0.0,
+      "latency_max": 22.426,
+      "failures": [],
+      "rows": [
+        {
+          "id": "pro-rate-limit",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.327
+        },
+        {
+          "id": "sla-credit",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.36
+        },
+        {
+          "id": "changelog-pro",
+          "status": "scored",
+          "keyword": "docs",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.238
+        },
+        {
+          "id": "acme-invoice",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.293
+        },
+        {
+          "id": "soylent-invoice",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.259
+        },
+        {
+          "id": "enterprise-customers",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.292
+        },
+        {
+          "id": "inc-104-enterprise",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.454
+        },
+        {
+          "id": "outage-who",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.262
+        },
+        {
+          "id": "mixed-outage",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.292
+        },
+        {
+          "id": "side-email",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "unknown",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.251
+        },
+        {
+          "id": "paraphrase-pro",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "docs",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.238
+        },
+        {
+          "id": "paraphrase-acme-pay",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.309
+        },
+        {
+          "id": "hooli-july",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.643
+        },
+        {
+          "id": "acme-july-2026",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.292
+        },
+        {
+          "id": "acme-missing-2019",
+          "status": "scored",
+          "keyword": "sql",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.205
+        },
+        {
+          "id": "reverse-soylent",
+          "status": "scored",
+          "keyword": "graph",
+          "model": "graph",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.357
+        },
+        {
+          "id": "mixed-two-tools",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.192
+        },
+        {
+          "id": "paraphrase-spend",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.286
+        },
+        {
+          "id": "paraphrase-subscribers",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "sql",
+          "fallback": false,
+          "ok": true,
+          "seconds": 1.558
+        },
+        {
+          "id": "private-text",
+          "status": "scored",
+          "keyword": "unknown",
+          "model": "unknown",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.353
+        },
+        {
+          "id": "mixed-graph-docs",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.33
+        },
+        {
+          "id": "mixed-sql-docs",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.266
+        },
+        {
+          "id": "mixed-three-tools",
+          "status": "scored",
+          "keyword": "mixed",
+          "model": "mixed",
+          "fallback": false,
+          "ok": true,
+          "seconds": 0.454
+        }
+      ]
+    },
+    "extended": {
+      "sql_ok": 6,
+      "sql_total": 6,
+      "graph_ok": 1,
+      "graph_total": 1,
+      "reverse_ok": 1,
+      "reverse_total": 1,
+      "docs_ok": 1,
+      "docs_total": 1,
+      "mixed_fixed_ok": 4,
+      "mixed_dynamic_ok": 4,
+      "mixed_total": 4,
+      "grounding": [
+        {
+          "id": "acme-july-2026",
+          "flags": [
+            "Citation check: the answer did not cite a source id."
+          ],
+          "answer": "Acme\u2019s invoice for the period\u202fJuly\u202f1\u202f\u2013\u202fJuly\u202f31\u202f2026 was **$2,100.00**\u3010S1\u3011.\n\nChecks: Citation check: the answer did not cite a source id. These checks cover source ids, pages, names, and amounts. They do not prove every sentence is right."
+        },
+        {
+          "id": "mixed-two-tools",
+          "flags": [
+            "Citation check: the answer did not cite a source id."
+          ],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "sql"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-graph-docs",
+          "flags": [],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "docs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-sql-docs",
+          "flags": [
+            "Citation check: the answer did not cite a source id."
+          ],
+          "planner": "llama",
+          "steps": [
+            "sql",
+            "docs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "mixed-three-tools",
+          "flags": [
+            "Citation check: the answer did not cite a source id."
+          ],
+          "planner": "llama",
+          "steps": [
+            "graph",
+            "sql",
+            "docs"
+          ],
+          "missing": []
+        }
+      ]
+    }
+  },
+  "unseen": {
+    "ok": 4,
+    "scored": 4,
+    "skipped": [],
+    "rows": [
+      {
+        "id": "unseen-overage",
+        "route": "docs",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "id": "unseen-initech",
+        "route": "sql",
+        "ok": true,
+        "detail": "sql=True"
+      },
+      {
+        "id": "unseen-incident-acme",
+        "route": "graph",
+        "ok": true,
+        "detail": "names=True plan=True"
+      },
+      {
+        "id": "unseen-limit-and-hooli",
+        "route": "mixed",
+        "ok": true,
+        "detail": "steps=['sql', 'docs']"
+      }
+    ]
+  },
+  "agent": {
+    "ok": 4,
+    "scored": 4,
+    "errors": 0,
+    "failures": [],
+    "rows": [
+      {
+        "id": "agent-docs",
+        "steps": [
+          "docs"
+        ],
+        "ok": true,
+        "seconds": 15.065,
+        "grounding": [
+          "Citation check: the answer did not cite a source id."
+        ],
+        "answer": "The Pro rate limit is **200 requests per second**\u3010D1\u2020L1-L2\u3011\u3010D2\u2020L1-L4\u3011.\n\nChecks: Citation check: the answer did not cite a source id. These checks cover source ids, pages, names, and amounts. They do not prove every sentence is right."
+      },
+      {
+        "id": "agent-sql",
+        "steps": [
+          "sql"
+        ],
+        "ok": true,
+        "seconds": 14.705,
+        "grounding": [
+          "Citation check: the answer did not cite a source id."
+        ],
+        "answer": "Acme\u2019s invoice for the period\u202fAugust\u202f1\u202f\u2013\u202fAugust\u202f31\u202f2026 was **$3,470.00**\u3010S1\u3011.\n\nChecks: Citation check: the answer did not cite a source id. These checks cover source ids, pages, names, and amounts. They do not prove every sentence is right."
+      },
+      {
+        "id": "agent-graph",
+        "steps": [
+          "graph"
+        ],
+        "ok": true,
+        "seconds": 15.511,
+        "grounding": [
+          "Citation check: the answer did not cite a source id."
+        ],
+        "answer": "INC\u2011104 affected the accounts **Acme** and **Soylent**\u3010G1\u3011\u3010G2\u3011.\n\nChecks: Citation check: the answer did not cite a source id. These checks cover source ids, pages, names, and amounts. They do not prove every sentence is right."
+      },
+      {
+        "id": "agent-mixed",
+        "steps": [
+          "graph",
+          "sql",
+          "sql"
+        ],
+        "ok": true,
+        "seconds": 30.166,
+        "grounding": [
+          "Citation check: the answer did not cite a source id."
+        ],
+        "answer": "INC\u2011104 affected two accounts:\n\n* **Acme** \u2013 listed in the incident record for INC\u2011104\u3010G1\u3011. No August\u202f2026 invoice data is provided in the evidence.  \n* **Soylent** \u2013 also listed in the incident record for INC\u2011104\u3010G2\u3011, and its August\u202f2026 invoice totals **$2,180.00**\u3010S1\u3011.\n\nChecks: Citation check: the answer did not cite a source id. These checks cover source ids, pages, names, and amounts. They do not prove every sentence is right."
+      }
+    ]
+  },
+  "rate_limit_events": 0
+}

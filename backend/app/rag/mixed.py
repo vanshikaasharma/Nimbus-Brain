@@ -208,7 +208,7 @@ def run_mixed(database_url: str, question: str) -> dict:
     drafted = draft_steps(question)
     if drafted:
         steps = drafted
-        planner = "llama"
+        planner = "chat"
     else:
         steps = fallback_steps(question)
         planner = "keyword"
