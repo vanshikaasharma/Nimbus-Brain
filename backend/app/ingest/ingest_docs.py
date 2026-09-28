@@ -21,29 +21,32 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from app.ingest.chunk import chunk_corpus  # noqa: E402
-from app.rag.embeddings import DIM, embed_texts  # noqa: E402
+from app.rag.embeddings import doc_table, embed_texts, embedding_dim  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT / ".env")
 
-SCHEMA = f"""
+def schema_for(table: str, dim: int) -> str:
+    if table not in {"doc_chunks", "doc_chunks_qwen3"}:
+        raise ValueError("Unknown document table.")
+    return f"""
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS doc_chunks (
+CREATE TABLE IF NOT EXISTS {table} (
     id SERIAL PRIMARY KEY,
     doc_path TEXT NOT NULL,
     section TEXT NOT NULL,
     body TEXT NOT NULL,
-    embedding vector({DIM}) NOT NULL,
+    embedding vector({dim}) NOT NULL,
     page_number INTEGER,
     source_id TEXT,
     tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(body, ''))) STORED
 );
 
-ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS page_number INTEGER;
-ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS source_id TEXT;
+ALTER TABLE {table} ADD COLUMN IF NOT EXISTS page_number INTEGER;
+ALTER TABLE {table} ADD COLUMN IF NOT EXISTS source_id TEXT;
 
-CREATE INDEX IF NOT EXISTS doc_chunks_tsv_idx ON doc_chunks USING GIN (tsv);
+CREATE INDEX IF NOT EXISTS {table}_tsv_idx ON {table} USING GIN (tsv);
 """
 
 
@@ -52,6 +55,7 @@ def main():
     if not url:
         raise SystemExit("DATABASE_URL is missing. Copy .env.example to .env.")
 
+    table = doc_table()
     chunks, skipped = chunk_corpus()
     if not chunks:
         raise SystemExit("No markdown or text PDF files found in corpus/.")
@@ -61,19 +65,19 @@ def main():
 
     with psycopg.connect(url) as conn:
         register_vector(conn)
-        for statement in SCHEMA.split(";"):
+        for statement in schema_for(table, embedding_dim()).split(";"):
             statement = statement.strip()
             if statement:
                 conn.execute(statement)
 
         conn.execute(
-            "DELETE FROM doc_chunks WHERE doc_path = ANY(%s)",
+            f"DELETE FROM {table} WHERE doc_path = ANY(%s)",
             (paths,),
         )
         for chunk, vector in zip(chunks, vectors):
             conn.execute(
-                """
-                INSERT INTO doc_chunks (doc_path, section, body, embedding, page_number, source_id)
+                f"""
+                INSERT INTO {table} (doc_path, section, body, embedding, page_number, source_id)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
@@ -87,7 +91,7 @@ def main():
             )
         conn.commit()
 
-    print(f"Indexed {len(chunks)} chunks from corpus/ into doc_chunks.")
+    print(f"Indexed {len(chunks)} chunks from corpus/ into {table}.")
     if skipped:
         print(
             f"Skipped {skipped} PDF page(s) with no extractable text. "

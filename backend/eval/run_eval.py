@@ -140,15 +140,20 @@ def graph_direction_ok(item: dict, result: dict) -> bool | None:
 
 
 def run_llm(url: str) -> None:
-    """Compare keyword labels with Llama, then check the extended questions."""
+    """Compare keyword labels with the configured chat model, then check the extended questions."""
+    from app.rag.chat import RATE_LIMITS, chat_model
     from app.rag.mixed import draft_steps, fallback_steps, run_mixed
     from app.rag.router import choose_route
 
+    print(f"chat model: {chat_model()}")
     questions = load_questions(GOLDEN, EXTENDED)
     print(f"LLM comparison sample: {len(questions)} questions")
     keyword_ok = 0
-    llama_ok = 0
+    model_ok = 0
+    model_scored = 0
     fallback_used = 0
+    rate_limited = 0
+    unavailable = 0
     failures = []
     latencies = []
 
@@ -158,18 +163,27 @@ def run_llm(url: str) -> None:
         picked = choose_route(item["question"])
         elapsed = time.perf_counter() - started
         latencies.append(elapsed)
-        llama = picked["route"]
         keyword_ok += int(keyword == item["route"])
-        llama_ok += int(llama == item["route"])
+        if picked.get("rate_limited"):
+            rate_limited += 1
+            print(f"{item['id']:<22} RATE LIMIT {elapsed:.1f}s (not scored as the chat model)")
+            continue
+        if picked.get("unavailable"):
+            unavailable += 1
+            print(f"{item['id']:<22} UNAVAILABLE {elapsed:.1f}s (not scored as the chat model)")
+            continue
+        model = picked["route"]
+        model_scored += 1
+        model_ok += int(model == item["route"])
         if picked.get("fallback"):
             fallback_used += 1
-        mark = "ok" if llama == item["route"] else "MISS"
+        mark = "ok" if model == item["route"] else "MISS"
         print(
-            f"{item['id']:<22} keyword={keyword:<8} llama={llama:<8} "
+            f"{item['id']:<22} keyword={keyword:<8} model={model:<8} "
             f"{mark} {elapsed:.1f}s"
         )
-        if llama != item["route"]:
-            failures.append(f"{item['id']}: llama {llama}, expected {item['route']}")
+        if model != item["route"]:
+            failures.append(f"{item['id']}: model {model}, expected {item['route']}")
 
     extended = json.loads(EXTENDED.read_text())["questions"]
     print()
@@ -234,7 +248,14 @@ def run_llm(url: str) -> None:
         elif item["route"] == "mixed":
             mixed_total += 1
             fixed = fallback_steps(item["question"])
+            before_limits = len(RATE_LIMITS)
             dynamic = draft_steps(item["question"])
+            if len(RATE_LIMITS) > before_limits:
+                mixed_total -= 1
+                print(f"  {item['id']}: RATE LIMIT during planning (not scored as the chat model)")
+                elapsed = time.perf_counter() - started
+                latencies.append(elapsed)
+                continue
             expected = item.get("expect_tools") or []
             fixed_match = fixed == expected
             dynamic_match = dynamic == expected
@@ -254,7 +275,11 @@ def run_llm(url: str) -> None:
 
     print()
     print(f"keyword labels: {keyword_ok}/{len(questions)}")
-    print(f"llama labels: {llama_ok}/{len(questions)} (fallbacks to keywords: {fallback_used})")
+    print(
+        f"chat model labels: {model_ok}/{model_scored} scored "
+        f"(fallbacks to keywords: {fallback_used}, rate limits: {rate_limited}, "
+        f"unavailable: {unavailable}, recorded rate-limit events: {len(RATE_LIMITS)})"
+    )
     print(f"extended sql: {sql_ok}/{sql_total}")
     print(f"extended graph names: {graph_ok}/{graph_total}")
     print(f"extended reverse plans: {direction_ok}/{direction_total}")
@@ -295,6 +320,71 @@ AGENT_QUESTIONS = [
 ]
 
 
+UNSEEN = [
+    {
+        "id": "unseen-overage",
+        "question": "What does Pro charge for each extra million events?",
+        "route": "docs",
+    },
+    {
+        "id": "unseen-initech",
+        "question": "What did Initech spend in July 2026?",
+        "route": "sql",
+        "expect_cents": 49900,
+    },
+    {
+        "id": "unseen-incident-acme",
+        "question": "Which incident touched the Acme account?",
+        "route": "graph",
+        "expect_names": ["INC-104", "Acme"],
+    },
+    {
+        "id": "unseen-limit-and-hooli",
+        "question": "What is the Pro rate limit, and what did Hooli pay in July 2026?",
+        "route": "mixed",
+        "expect_tools": ["sql", "docs"],
+    },
+]
+
+
+def run_unseen(url: str) -> None:
+    """Questions that are not in the 23-question routing set."""
+    from app.rag.chat import RATE_LIMITS
+    from app.rag.mixed import draft_steps
+    from app.rag.router import choose_route
+
+    print(f"Unseen routing sample: {len(UNSEEN)} questions")
+    scored = 0
+    ok = 0
+    for item in UNSEEN:
+        before = len(RATE_LIMITS)
+        picked = choose_route(item["question"])
+        if picked.get("rate_limited") or picked.get("unavailable") or len(RATE_LIMITS) > before:
+            print(f"  {item['id']}: not scored ({picked.get('reason')})")
+            continue
+        scored += 1
+        match = picked["route"] == item["route"]
+        detail = ""
+        if item["route"] == "sql" and match:
+            result = run_question(url, item["question"])
+            row_ok = sql_match(item, result)
+            match = row_ok
+            detail = f" sql={row_ok}"
+        if item["route"] == "graph" and match:
+            result = walk(url, item["question"])
+            blob = " ".join(result.get("paths") or [])
+            name_ok = all(name in blob for name in item["expect_names"])
+            match = name_ok
+            detail = f" names={name_ok} plan={bool(result.get('plan'))}"
+        if item["route"] == "mixed":
+            steps = draft_steps(item["question"])
+            match = set(steps or []) == set(item["expect_tools"])
+            detail = f" steps={steps}"
+        ok += int(match)
+        print(f"  {item['id']}: route={picked['route']} ok={match}{detail}")
+    print(f"unseen chat-model items: {ok}/{scored}")
+
+
 def run_agent_eval(url: str) -> None:
     """Score the LangGraph loop on its own. Not the keyword report card."""
     from app.rag.agent import run_agent
@@ -302,9 +392,17 @@ def run_agent_eval(url: str) -> None:
     print(f"Agent sample: {len(AGENT_QUESTIONS)} questions")
     ok = 0
     failures = []
+    skipped = 0
     for item in AGENT_QUESTIONS:
         started = time.perf_counter()
-        result = run_agent(url, item["question"])
+        try:
+            result = run_agent(url, item["question"])
+        except Exception as exc:
+            skipped += 1
+            elapsed = time.perf_counter() - started
+            print(f"{item['id']:<22} ERROR {type(exc).__name__}: {exc} {elapsed:.1f}s")
+            failures.append(f"{item['id']}: {type(exc).__name__}: {exc}")
+            continue
         elapsed = time.perf_counter() - started
         steps = result.get("steps") or []
         expected = item.get("expect_tools") or [item["expect_tool"]]
@@ -316,7 +414,7 @@ def run_agent_eval(url: str) -> None:
         )
         if not match:
             failures.append(f"{item['id']}: steps {steps}, expected {expected}")
-    print(f"agent tool choice: {ok}/{len(AGENT_QUESTIONS)}")
+    print(f"agent tool choice: {ok}/{len(AGENT_QUESTIONS) - skipped} scored, {skipped} errors")
     if failures:
         print("agent failures:")
         for item in failures:
@@ -327,8 +425,16 @@ def run_agent_eval(url: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--llm", action="store_true", help="Also score Llama routing and the agent loop")
+    parser.add_argument("--llm", action="store_true", help="Also score the chat model, unseen questions, and the agent loop")
+    parser.add_argument("--chat", choices=("ollama", "groq"), default=None)
     args = parser.parse_args()
+    if args.chat == "ollama":
+        os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:11434/v1"
+        os.environ["OPENAI_CHAT_MODEL"] = "llama3.2"
+        os.environ["OPENAI_API_KEY"] = "ollama"
+    elif args.chat == "groq":
+        os.environ["OPENAI_BASE_URL"] = "https://api.groq.com/openai/v1"
+        os.environ["OPENAI_CHAT_MODEL"] = "openai/gpt-oss-120b"
     main()
     if args.llm:
         database = os.environ.get("DATABASE_URL")
@@ -336,5 +442,7 @@ if __name__ == "__main__":
             raise SystemExit("DATABASE_URL is missing.")
         print()
         run_llm(database)
+        print()
+        run_unseen(database)
         print()
         run_agent_eval(database)

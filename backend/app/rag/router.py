@@ -127,31 +127,21 @@ def parse_route(text: str) -> str | None:
     return word if word in ROUTES else None
 
 
-def draft_route(question: str) -> str | None:
-    api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
-    if not api_key:
-        return None
-    from openai import APIConnectionError, APITimeoutError, OpenAI
+def draft_route(question: str) -> tuple[str | None, str | None]:
+    """Return (route, problem). problem is rate_limit, unavailable, or None."""
+    from app.rag.chat import ChatProblem, call_chat
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
-        timeout=45.0,
-    )
-    model = os.environ.get("OPENAI_CHAT_MODEL", "llama3.2")
     try:
-        response = client.chat.completions.create(
-            model=model,
-            temperature=0,
-            max_tokens=80,
-            messages=[
+        text = call_chat(
+            [
                 {"role": "system", "content": ROUTE_SYSTEM},
                 {"role": "user", "content": question},
             ],
+            max_tokens=80,
         )
-    except (APITimeoutError, APIConnectionError):
-        return None
-    return parse_route(response.choices[0].message.content or "")
+    except ChatProblem as exc:
+        return None, exc.kind
+    return parse_route(text), None
 
 
 def widen_single_label(picked: str, question: str) -> str:
@@ -166,17 +156,32 @@ def widen_single_label(picked: str, question: str) -> str:
 def choose_route(question: str) -> dict:
     """Llama picks the route. Keyword rules run when that pick is not usable."""
     keyword = classify(question)
-    picked = draft_route(question)
+    picked, problem = draft_route(question)
+    if problem == "rate_limit":
+        return {
+            "route": keyword["route"],
+            "reason": "Groq rate limit. Keyword fallback used. This label is not from the chat model.",
+            "fallback": True,
+            "rate_limited": True,
+        }
+    if problem in {"unavailable", "missing_key"}:
+        return {
+            "route": keyword["route"],
+            "reason": "Keyword fallback. The chat model was not reachable. " + keyword["reason"],
+            "fallback": True,
+            "unavailable": True,
+        }
     if picked is not None:
         widened = widen_single_label(picked, question)
         if widened != picked:
             return {
                 "route": widened,
                 "reason": (
-                    f"Llama chose {picked}. The question names more than one evidence type, "
+                    f"Chat model chose {picked}. The question names more than one evidence type, "
                     "so the route is mixed."
                 ),
                 "fallback": False,
+                "rate_limited": False,
             }
         picked = widened
     if picked is None:
@@ -184,17 +189,20 @@ def choose_route(question: str) -> dict:
             "route": keyword["route"],
             "reason": "Keyword fallback. " + keyword["reason"],
             "fallback": True,
+            "rate_limited": False,
         }
     if picked == keyword["route"]:
         return {
             "route": picked,
-            "reason": f"Llama chose {picked}. Keyword rules agreed.",
+            "reason": f"Chat model chose {picked}. Keyword rules agreed.",
             "fallback": False,
+            "rate_limited": False,
         }
     return {
         "route": picked,
         "reason": (
-            f"Llama chose {picked}. Keyword rules would have chosen {keyword['route']}."
+            f"Chat model chose {picked}. Keyword rules would have chosen {keyword['route']}."
         ),
         "fallback": False,
+        "rate_limited": False,
     }

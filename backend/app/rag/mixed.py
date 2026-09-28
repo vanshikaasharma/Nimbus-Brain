@@ -173,27 +173,19 @@ def draft_steps(question: str) -> list[str] | None:
     api_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not api_key:
         return None
-    from openai import APIConnectionError, APITimeoutError, OpenAI
+    from app.rag.chat import ChatProblem, call_chat
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
-        timeout=45.0,
-    )
-    model = os.environ.get("OPENAI_CHAT_MODEL", "llama3.2")
     try:
-        response = client.chat.completions.create(
-            model=model,
-            temperature=0,
-            max_tokens=120,
-            messages=[
+        text = call_chat(
+            [
                 {"role": "system", "content": PLAN_SYSTEM},
                 {"role": "user", "content": question},
             ],
+            max_tokens=120,
         )
-    except (APITimeoutError, APIConnectionError):
+    except ChatProblem:
         return None
-    parsed = parse_steps(response.choices[0].message.content or "")
+    parsed = parse_steps(text)
     if not parsed:
         return None
     from app.rag.coverage import needed_tools

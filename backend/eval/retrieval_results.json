@@ -1,0 +1,166 @@
+[
+  {
+    "embedding": "bge",
+    "reranker": "minilm",
+    "ingest_seconds": 5.6,
+    "recall_at_3": 1.0,
+    "mrr_before_rerank": 0.9166666666666666,
+    "mrr_after_rerank": 0.8333333333333334,
+    "mean_latency_seconds": 1.1573437083333336,
+    "questions": [
+      {
+        "id": "paraphrase-pro-limit",
+        "kind": "paraphrase",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 1.881
+      },
+      {
+        "id": "exact-outage-duration",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 0.797
+      },
+      {
+        "id": "similar-starter-not-pro",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 2,
+        "seconds": 1.068
+      },
+      {
+        "id": "quiet-hours-credit",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 1.017
+      },
+      {
+        "id": "exact-ledger-token",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 1.048
+      },
+      {
+        "id": "pdf-burst-ceiling",
+        "kind": "pdf passage",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 1.132
+      }
+    ]
+  },
+  {
+    "embedding": "bge",
+    "reranker": "qwen3",
+    "error": "OperationalError: consuming input failed: server closed the connection unexpectedly\n\tThis probably means the server terminated abnormally\n\tbefore or while processing the request.\nserver closed the connection unexpectedly\n\tThis probably means the server terminated abnormally\n\tbefore or while processing the request."
+  },
+  {
+    "embedding": "qwen3",
+    "reranker": "minilm",
+    "ingest_seconds": 196.1,
+    "recall_at_3": 1.0,
+    "mrr_before_rerank": 0.8333333333333334,
+    "mrr_after_rerank": 0.8333333333333334,
+    "mean_latency_seconds": 0.3620500761666487,
+    "questions": [
+      {
+        "id": "paraphrase-pro-limit",
+        "kind": "paraphrase",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 0.506
+      },
+      {
+        "id": "exact-outage-duration",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 0.387
+      },
+      {
+        "id": "similar-starter-not-pro",
+        "kind": "similar section",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 0.413
+      },
+      {
+        "id": "quiet-hours-credit",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 0.222
+      },
+      {
+        "id": "exact-ledger-token",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 0.331
+      },
+      {
+        "id": "pdf-burst-ceiling",
+        "kind": "pdf passage",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 0.314
+      }
+    ]
+  },
+  {
+    "embedding": "qwen3",
+    "reranker": "qwen3",
+    "ingest_seconds": 3.1,
+    "recall_at_3": 1.0,
+    "mrr_before_rerank": 0.8333333333333334,
+    "mrr_after_rerank": 0.8333333333333334,
+    "mean_latency_seconds": 69.78654357616664,
+    "questions": [
+      {
+        "id": "paraphrase-pro-limit",
+        "kind": "paraphrase",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 69.203
+      },
+      {
+        "id": "exact-outage-duration",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 66.763
+      },
+      {
+        "id": "similar-starter-not-pro",
+        "kind": "similar section",
+        "fused_rank": 2,
+        "rerank_rank": 2,
+        "seconds": 99.54
+      },
+      {
+        "id": "quiet-hours-credit",
+        "kind": "similar section",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 58.856
+      },
+      {
+        "id": "exact-ledger-token",
+        "kind": "exact terminology",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 59.534
+      },
+      {
+        "id": "pdf-burst-ceiling",
+        "kind": "pdf passage",
+        "fused_rank": 1,
+        "rerank_rank": 1,
+        "seconds": 64.823
+      }
+    ]
+  }
+]

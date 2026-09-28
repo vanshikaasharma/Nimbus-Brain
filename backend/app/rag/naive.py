@@ -37,31 +37,31 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
             "Set OPENAI_API_KEY if you want a generated answer from these chunks."
         )
 
-    from openai import OpenAI
+    from app.rag.chat import ChatProblem, call_chat
 
-    base_url = os.environ.get("OPENAI_BASE_URL") or None
-    model = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Answer using only the passages. Cite each fact with its source id, "
-                    "such as [D1]. If they do not contain the answer, say you do not know. "
-                    "Do not invent numbers."
-                ),
-            },
-            {
-                "role": "user",
-                "content": f"Passages:\n{passages}\n\nQuestion: {question}",
-            },
-        ],
-    )
+    try:
+        text = call_chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Answer using only the passages. Cite each fact with its source id, "
+                        "such as [D1]. If they do not contain the answer, say you do not know. "
+                        "Do not invent numbers."
+                    ),
+                },
+                {"role": "user", "content": f"Passages:\n{passages}\n\nQuestion: {question}"},
+            ],
+            max_tokens=220,
+            default_model="gpt-4o-mini",
+        )
+    except ChatProblem as exc:
+        if exc.kind == "rate_limit":
+            return "The chat model hit a rate limit. No other model was called."
+        text = ""
     from app.rag.generate import review_answer
 
-    text = (response.choices[0].message.content or "").strip() or "No answer returned."
+    text = text or "No answer returned."
     checked, _flags = review_answer(
         text,
         {f"D{index}" for index in range(1, len(chunks) + 1)},

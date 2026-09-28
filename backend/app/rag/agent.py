@@ -125,11 +125,19 @@ def run_agent(database_url: str, question: str) -> dict:
             return "No path."
         return "\n".join(f"[G{index}] {path}" for index, path in enumerate(paths, start=1))
 
+    from app.rag.chat import chat_base_url, chat_model, token_budget
+
+    model_name = chat_model()
+    chat_kwargs = {}
+    if "gpt-oss" in model_name:
+        chat_kwargs["extra_body"] = {"reasoning_effort": "low"}
     model = ChatOpenAI(
-        model=os.environ.get("OPENAI_CHAT_MODEL", "llama3.2"),
+        model=model_name,
         api_key=api_key,
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
+        base_url=chat_base_url(),
         temperature=0,
+        max_tokens=token_budget(400),
+        **chat_kwargs,
     )
     agent = create_react_agent(
         model,

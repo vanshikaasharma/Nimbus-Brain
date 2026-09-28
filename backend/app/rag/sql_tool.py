@@ -96,8 +96,6 @@ ORDER BY c.name
 
 
 def draft_sql_with_llm(question: str, today: date | None = None) -> tuple[str, str]:
-    from openai import OpenAI
-
     current = app_today(today)
     period = period_for_question(question, current)
     period_note = (
@@ -105,15 +103,11 @@ def draft_sql_with_llm(question: str, today: date | None = None) -> tuple[str, s
         if period is not None
         else "The question does not name a month. Do not add a date filter."
     )
-    api_key = os.environ["OPENAI_API_KEY"]
-    client = OpenAI(
-        api_key=api_key,
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
-    )
-    model = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
+    from app.rag.chat import ChatProblem, call_chat
+
+    try:
+        sql = call_chat(
+            [
             {
                 "role": "system",
                 "content": (
@@ -130,8 +124,13 @@ def draft_sql_with_llm(question: str, today: date | None = None) -> tuple[str, s
             },
             {"role": "user", "content": question},
         ],
-    )
-    sql = (response.choices[0].message.content or "").strip()
+            max_tokens=180,
+            default_model="gpt-4o-mini",
+        )
+    except ChatProblem as exc:
+        if exc.kind == "rate_limit":
+            raise RuntimeError("Groq rate limit. No other model was called.") from exc
+        raise
     return sql, "LLM wrote this SELECT from the schema + question."
 
 

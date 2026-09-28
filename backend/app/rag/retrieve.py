@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import psycopg
 
-from app.rag.embeddings import embed_texts
+from app.rag.embeddings import doc_table, embed_texts
 
 CANDIDATES = 10
 RRF_K = 60
@@ -25,32 +25,37 @@ def chunk_row(row) -> dict:
     }
 
 
-def ensure_keyword_column(conn) -> None:
+def ensure_keyword_column(conn, table: str | None = None) -> None:
+    name = table or doc_table()
+    if name not in {"doc_chunks", "doc_chunks_qwen3"}:
+        raise ValueError("Unknown document table.")
+    index = f"{name}_tsv_idx"
     conn.execute(
-        """
-        ALTER TABLE doc_chunks
+        f"""
+        ALTER TABLE {name}
         ADD COLUMN IF NOT EXISTS tsv tsvector
         GENERATED ALWAYS AS (to_tsvector('english', coalesce(body, ''))) STORED
         """
     )
     conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS doc_chunks_tsv_idx
-        ON doc_chunks USING GIN (tsv)
+        f"""
+        CREATE INDEX IF NOT EXISTS {index}
+        ON {name} USING GIN (tsv)
         """
     )
-    conn.execute("ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS page_number INTEGER")
-    conn.execute("ALTER TABLE doc_chunks ADD COLUMN IF NOT EXISTS source_id TEXT")
+    conn.execute(f"ALTER TABLE {name} ADD COLUMN IF NOT EXISTS page_number INTEGER")
+    conn.execute(f"ALTER TABLE {name} ADD COLUMN IF NOT EXISTS source_id TEXT")
 
 
 def hybrid_search(conn, question: str) -> list[dict]:
-    ensure_keyword_column(conn)
-    query_vec = embed_texts([question])[0]
+    table = doc_table()
+    ensure_keyword_column(conn, table)
+    query_vec = embed_texts([question], query=True)[0]
     rows = conn.execute(
-        """
+        f"""
         WITH vector_hits AS (
             SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> %(vec)s::vector) AS rank
-            FROM doc_chunks
+            FROM {table}
             ORDER BY embedding <=> %(vec)s::vector
             LIMIT %(n)s
         ),
@@ -58,7 +63,7 @@ def hybrid_search(conn, question: str) -> list[dict]:
             SELECT id, ROW_NUMBER() OVER (
                 ORDER BY ts_rank(tsv, plainto_tsquery('english', %(q)s)) DESC
             ) AS rank
-            FROM doc_chunks
+            FROM {table}
             WHERE tsv @@ plainto_tsquery('english', %(q)s)
             ORDER BY ts_rank(tsv, plainto_tsquery('english', %(q)s)) DESC
             LIMIT %(n)s
@@ -74,7 +79,7 @@ def hybrid_search(conn, question: str) -> list[dict]:
         )
         SELECT c.doc_path, c.section, c.body, c.page_number, c.source_id, f.score
         FROM fused f
-        JOIN doc_chunks c ON c.id = f.id
+        JOIN {table} c ON c.id = f.id
         ORDER BY f.score DESC
         LIMIT %(n)s
         """,
@@ -90,13 +95,14 @@ def hybrid_search(conn, question: str) -> list[dict]:
 
 def vector_search(conn, question: str, limit: int = 3) -> list[dict]:
     """Top-k by embedding only. The baseline the report card compares against."""
-    ensure_keyword_column(conn)
-    query_vec = embed_texts([question])[0]
+    table = doc_table()
+    ensure_keyword_column(conn, table)
+    query_vec = embed_texts([question], query=True)[0]
     rows = conn.execute(
-        """
+        f"""
         SELECT doc_path, section, body, page_number, source_id,
                1 - (embedding <=> %(vec)s::vector) AS score
-        FROM doc_chunks
+        FROM {table}
         ORDER BY embedding <=> %(vec)s::vector
         LIMIT %(limit)s
         """,

@@ -61,8 +61,39 @@ class GroundingTests(unittest.TestCase):
             "[S2] {'name': 'Soylent', 'amount_dollars': '2180.00'}"
         )
         _answer, flags = review_answer("Acme was $3470 [S1].", {"S1", "S2"}, evidence)
-        self.assertTrue(any("more than one total" in flag for flag in flags))
+        self.assertTrue(any(flag.startswith("Validation note:") and "more than one invoice total" in flag for flag in flags))
         self.assertFalse(any("disagree" in flag for flag in flags))
+
+    def test_document_fee_is_not_a_second_invoice_for_the_customer(self):
+        evidence = (
+            "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}\n"
+            "[D1] pricing.md#Enterprise > Enterprise\nThe Enterprise platform fee is $2,000."
+        )
+        _answer, flags = review_answer("Acme's August invoice was $3470 [S1].", {"S1", "D1"}, evidence)
+        self.assertFalse(any("disagree" in flag for flag in flags))
+        self.assertFalse(any("more than one" in flag for flag in flags))
+
+    def test_validation_note_does_not_spend_the_rewrite(self):
+        from app.rag.generate import answer_with_sources
+
+        calls = []
+
+        def write(question, evidence):
+            calls.append(question)
+            return "Acme was $3470 [S1]."
+
+        evidence = (
+            "[S1] {'name': 'Acme', 'amount_dollars': '3470.00'}\n"
+            "[S2] {'name': 'Soylent', 'amount_dollars': '2180.00'}"
+        )
+        _answer, flags = answer_with_sources(
+            "What did Acme pay?",
+            [("S1", "{'name': 'Acme', 'amount_dollars': '3470.00'}"), ("S2", "{'name': 'Soylent', 'amount_dollars': '2180.00'}")],
+            write=write,
+        )
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(any(flag.startswith("Validation note:") for flag in flags))
+        self.assertIn("2180", evidence)
 
     def test_contradictory_evidence_must_be_mentioned(self):
         evidence = (

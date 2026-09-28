@@ -1,0 +1,40 @@
+{
+  "questions": [
+    {
+      "id": "paraphrase-pro-limit",
+      "question": "How many requests per second does the Pro plan allow?",
+      "expect_source": "pricing.md#Pro",
+      "kind": "paraphrase"
+    },
+    {
+      "id": "exact-outage-duration",
+      "question": "How long was the ingest pipeline down during the 2 hours 17 minutes outage?",
+      "expect_source": "changelog.md#2026-09-14",
+      "kind": "exact terminology"
+    },
+    {
+      "id": "similar-starter-not-pro",
+      "question": "What is the Starter plan rate limit in requests per second?",
+      "expect_source": "pricing.md#Starter",
+      "kind": "similar section"
+    },
+    {
+      "id": "quiet-hours-credit",
+      "question": "If events are dropped during the quiet hours window, what percent of the platform fee is credited?",
+      "expect_source": "eval-retention.md#Quiet hours credit",
+      "kind": "similar section"
+    },
+    {
+      "id": "exact-ledger-token",
+      "question": "What is the retention ledger token?",
+      "expect_source": "eval-retention.md#Retention ledger token",
+      "kind": "exact terminology"
+    },
+    {
+      "id": "pdf-burst-ceiling",
+      "question": "What is the burst ceiling in events?",
+      "expect_source": "eval-burst.pdf#p2",
+      "kind": "pdf passage"
+    }
+  ]
+}

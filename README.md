@@ -65,7 +65,7 @@ Postgres (Neon) has three tables: `plans`, `customers`, `invoices`. Six accounts
 
 ## How to run
 
-Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`). Chat uses local Ollama: `OPENAI_API_KEY=ollama`, `OPENAI_BASE_URL=http://127.0.0.1:11434/v1`, `OPENAI_CHAT_MODEL=llama3.2`. Optional `APP_TIMEZONE` defaults to `America/Vancouver`. Override it in the environment to use another zone. Without a chat model, templates and keyword rules still run, and `/ask` still returns passages.
+Python 3.9+ and Node 20+. You need a Neon `DATABASE_URL` in a local `.env` (see `.env.example`). Chat uses Groq’s OpenAI-compatible endpoint: `OPENAI_BASE_URL=https://api.groq.com/openai/v1` and `OPENAI_CHAT_MODEL=openai/gpt-oss-120b`. Put the Groq key in `OPENAI_API_KEY`. Embeddings stay on the local BGE model. Optional `APP_TIMEZONE` defaults to `America/Vancouver`. Override it in the environment to use another zone. Without a chat model, templates and keyword rules still run, and `/ask` still returns passages.
 
 ```bash
 # one-time: install and seed
@@ -134,7 +134,7 @@ Llama comparison on those 10 plus 13 extended questions (`backend/eval/extended.
 python backend/eval/run_eval.py --llm
 ```
 
-Latest run on this machine, with local Llama 3.2 and the seeded Neon database:
+Latest scored run used local Llama 3.2, not Groq GPT-OSS 120B, on the seeded Neon database:
 
 | Check | Result |
 | --- | --- |

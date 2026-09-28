@@ -1,7 +1,7 @@
 """Write a short answer from evidence the tools already retrieved.
 
-Uses any OpenAI-compatible chat API. Groq's free tier works if you set
-OPENAI_BASE_URL to https://api.groq.com/openai/v1. No key means no sentence.
+Uses the OpenAI-compatible chat endpoint in .env. Groq GPT-OSS 120B is
+openai/gpt-oss-120b at https://api.groq.com/openai/v1. No key means no sentence.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ SYSTEM = (
     "Do not invent customers, dollar amounts, pages, or SLA terms. "
     "If two sources disagree, say they disagree. "
     "If a row has amount_dollars, that is the invoice total. Use it. "
+    "A platform fee, overage, or SLA dollar figure in a document is not an invoice total. "
     "The rows are already filtered to the period the question asked about. "
     "Keep the answer to a few sentences."
 )
@@ -49,30 +50,21 @@ def answer_from_evidence(question: str, evidence: str) -> str | None:
     if not api_key:
         return None
 
-    from openai import APIConnectionError, APITimeoutError, OpenAI
+    from app.rag.chat import ChatProblem, call_chat
 
-    client = OpenAI(
-        api_key=api_key,
-        base_url=os.environ.get("OPENAI_BASE_URL") or None,
-        timeout=45.0,
-    )
-    model = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
     try:
-        response = client.chat.completions.create(
-            model=model,
-            temperature=0,
-            max_tokens=220,
-            messages=[
+        text = call_chat(
+            [
                 {"role": "system", "content": SYSTEM},
-                {
-                    "role": "user",
-                    "content": f"Evidence:\n{evidence}\n\nQuestion: {question}",
-                },
+                {"role": "user", "content": f"Evidence:\n{evidence}\n\nQuestion: {question}"},
             ],
+            max_tokens=220,
+            default_model="gpt-4o-mini",
         )
-    except (APITimeoutError, APIConnectionError):
+    except ChatProblem as exc:
+        if exc.kind == "rate_limit":
+            return "The chat model hit a rate limit. No other model was called."
         return None
-    text = (response.choices[0].message.content or "").strip()
     return text or None
 
 
@@ -96,6 +88,39 @@ def _money(text: str) -> set[str]:
 
 def _pages(text: str) -> set[int]:
     return {int(item) for item in re.findall(r"\bpage\s+(\d+)\b", text, flags=re.I)}
+
+
+def _blocks(text: str) -> list[tuple[str, str]]:
+    """Split labeled evidence into [S1], [D1], and [G1] blocks."""
+    blocks = []
+    for part in re.split(r"(?=\[(?:G|S|D)\d+\])", text):
+        match = re.match(r"\[((?:G|S|D)\d+)\]\s*(.*)", part, flags=re.S)
+        if match:
+            blocks.append((match.group(1), match.group(2)))
+    return blocks
+
+
+def _normalize_amount(raw: str) -> str:
+    cleaned = raw.replace("$", "").replace(",", "").strip()
+    if "." in cleaned:
+        cleaned = cleaned.rstrip("0").rstrip(".")
+    return cleaned
+
+
+def _invoice_named(evidence: str) -> dict[str, set[str]]:
+    """Pair each customer with amount_dollars inside that customer's SQL row only."""
+    from app.rag.sql_tool import CUSTOMER_NAMES
+
+    found: dict[str, set[str]] = {}
+    for sid, body in _blocks(evidence):
+        if not sid.startswith("S"):
+            continue
+        amounts = {_normalize_amount(item) for item in re.findall(r"amount_dollars': '(\d+(?:\.\d+)?)'", body)}
+        amounts.discard("")
+        names = [name for name in CUSTOMER_NAMES if re.search(rf"\b{re.escape(name)}\b", body, flags=re.I)]
+        if len(names) == 1 and amounts:
+            found.setdefault(names[0], set()).update(amounts)
+    return found
 
 
 def _named_amounts(text: str) -> dict[str, set[str]]:
@@ -146,7 +171,7 @@ def review_answer(answer: str, valid_ids: set[str], evidence: str) -> tuple[str,
         if name.lower() in answer.lower() and name.lower() not in evidence_lower:
             flags.append(f"Evidence check: {name} is not in the evidence.")
 
-    evidence_named = _named_amounts(evidence)
+    evidence_named = _invoice_named(evidence)
     answer_named = _named_amounts(answer)
     for name, amounts in answer_named.items():
         known = evidence_named.get(name)
@@ -160,10 +185,14 @@ def review_answer(answer: str, valid_ids: set[str], evidence: str) -> tuple[str,
                 f"Evidence check: sources disagree on {name}, and the answer does not say so."
             )
 
-    evidence_amounts = _money(evidence)
+    invoice_totals = set()
+    for amounts in evidence_named.values():
+        invoice_totals.update(amounts)
     answer_amounts = _money(answer)
-    if len(evidence_amounts) > 1 and answer_amounts and answer_amounts < evidence_amounts:
-        flags.append("Evidence check: evidence has more than one total, and the answer does not mention each one.")
+    if len(invoice_totals) > 1 and answer_amounts and answer_amounts < invoice_totals:
+        flags.append(
+            "Validation note: evidence has more than one invoice total, and the answer does not mention each one."
+        )
 
     if flags:
         answer = (
@@ -193,14 +222,16 @@ def answer_with_sources(
     if not written:
         return None, []
     checked, flags = review_answer(written, valid_ids, evidence)
-    if not flags:
+    factual = [flag for flag in flags if not flag.startswith("Validation note:")]
+    if not factual:
         return checked, flags
     retry_question = (
         question
         + "\nThe previous answer failed these checks: "
-        + " ".join(flags)
+        + " ".join(factual)
         + " Rewrite it from the evidence only. Cite the source ids. "
-        + "If the evidence is not enough, say what is missing."
+        + "If the evidence is not enough, say what is missing. "
+        + "Do not repeat document fees that the question did not ask for."
     )
     second = writer(retry_question, evidence)
     if not second:
